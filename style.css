@@ -9,10 +9,11 @@ body {
 
 .navbar {
     background: #1e293b;
-    padding: 1rem 2rem;
+    padding: 1.25rem 2rem;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    gap: 1rem;
     border-bottom: 1px solid #334155;
 }
 
@@ -21,17 +22,26 @@ body {
     color: #38bdf8;
 }
 
-.navbar nav { display: flex; gap: 1rem; align-items: center; }
+.navbar nav { display: flex; gap: 0.75rem; align-items: center; justify-content: center; flex-wrap: wrap; }
 .navbar nav a {
     color: #94a3b8;
     text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
+    padding: 0.6rem 1.4rem;
+    border-radius: 10px;
     transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 80px;
+    border: 1px solid transparent;
 }
+.navbar nav a .nav-icon { font-size: 1.6rem; line-height: 1; }
+.navbar nav a .nav-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .navbar nav a:hover, .navbar nav a.active {
     color: #e2e8f0;
     background: #334155;
+    border-color: #475569;
 }
 
 .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }

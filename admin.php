@@ -136,9 +136,18 @@ $recentLogs = $db->query("
 <div class="navbar">
     <h1><?= APP_NAME ?></h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="admin.php" class="active">Admin</a>
-        <a href="logout.php">Esci (<?= htmlspecialchars($user['username']) ?>)</a>
+        <a href="dashboard.php">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="admin.php" class="active">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Admin</span>
+        </a>
+        <a href="logout.php">
+            <span class="nav-icon">🚪</span>
+            <span class="nav-label"><?= htmlspecialchars($user['username']) ?></span>
+        </a>
     </nav>
 </div>
 

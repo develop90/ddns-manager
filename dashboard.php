@@ -167,11 +167,20 @@ $serverHost = $_SERVER['HTTP_HOST'] ?? 'tuoserver.com';
 <div class="navbar">
     <h1><?= APP_NAME ?></h1>
     <nav>
-        <a href="dashboard.php" class="active">Dashboard</a>
+        <a href="dashboard.php" class="active">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Dashboard</span>
+        </a>
         <?php if (isAdmin()): ?>
-            <a href="admin.php">Admin</a>
+        <a href="admin.php">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Admin</span>
+        </a>
         <?php endif; ?>
-        <a href="logout.php">Esci (<?= htmlspecialchars($user['username']) ?>)</a>
+        <a href="logout.php">
+            <span class="nav-icon">🚪</span>
+            <span class="nav-label"><?= htmlspecialchars($user['username']) ?></span>
+        </a>
     </nav>
 </div>
 
