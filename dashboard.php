@@ -332,16 +332,16 @@ $serverHost = $_SERVER['HTTP_HOST'] ?? 'tuoserver.com';
             <table>
                 <tr><td><strong>Servizio</strong></td><td>Custom / DynDNS</td></tr>
                 <tr><td><strong>Server</strong></td><td><?= htmlspecialchars($serverHost) ?></td></tr>
-                <tr><td><strong>URL di aggiornamento</strong></td><td>/ddns/nic/update?hostname=&lt;h&gt;&amp;myip=&lt;a&gt;</td></tr>
+                <tr><td><strong>URL di aggiornamento</strong></td><td>/nic/update?hostname=&lt;h&gt;&amp;myip=&lt;a&gt;</td></tr>
                 <tr><td><strong>Username</strong></td><td><?= htmlspecialchars($user['username']) ?></td></tr>
                 <tr><td><strong>Password</strong></td><td>La tua password di login</td></tr>
             </table>
 
             <p class="mt-2"><strong>Oppure aggiorna via URL diretta (con token):</strong></p>
-            <code>http://<?= htmlspecialchars($serverHost) ?>/ddns/update.php?token=<?= htmlspecialchars($user['api_token']) ?>&amp;hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
+            <code>http://<?= htmlspecialchars($serverHost) ?>/update.php?token=<?= htmlspecialchars($user['api_token']) ?>&amp;hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
 
             <p class="mt-2"><strong>Oppure via HTTP Basic Auth (compatibile con i router):</strong></p>
-            <code>http://<?= htmlspecialchars($user['username']) ?>:PASSWORD@<?= htmlspecialchars($serverHost) ?>/ddns/nic/update?hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
+            <code>http://<?= htmlspecialchars($user['username']) ?>:PASSWORD@<?= htmlspecialchars($serverHost) ?>/nic/update?hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
 
             <p class="text-muted mt-1">Se ometti <em>myip</em>, verrà usato l'IP da cui proviene la richiesta.</p>
         </div>
