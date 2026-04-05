@@ -3,7 +3,7 @@ session_start();
 
 define('APP_NAME', 'DDNS Manager');
 define('DB_PATH', __DIR__ . '/data/ddns.sqlite');
-define('BASE_URL', '/ddns');
+define('BASE_URL', '');
 
 // Token secret per API
 define('TOKEN_SECRET', 'cambia-questa-chiave-segreta-' . md5(__DIR__));
