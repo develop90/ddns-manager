@@ -58,7 +58,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn btn-primary btn-block">Accedi</button>
         </form>
 
-        <p class="text-muted text-center mt-2">Credenziali default: admin / admin</p>
     </div>
 </div>
 </body>
