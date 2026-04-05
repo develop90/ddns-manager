@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# Compatibilità protocollo DynDNS2 / No-IP
+# I router inviano richieste a /nic/update
+RewriteRule ^nic/update$ update.php [L,QSA]
+
+# Protezione directory dati
+<FilesMatch "\.sqlite$">
+    Require all denied
+</FilesMatch>

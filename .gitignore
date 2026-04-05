@@ -1,0 +1,5 @@
+data/
+.claude/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
