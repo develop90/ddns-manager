@@ -88,10 +88,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
             $msg = 'Questo hostname esiste già su quel dominio.';
             $msgType = 'danger';
         } else {
-            $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ? WHERE id = ? AND user_id = ?")
-               ->execute([$newHostname, $newDomainId, $hostId, $user['id']]);
-            $msg = 'Host aggiornato.';
-            $msgType = 'success';
+            $customIp = trim($_POST['custom_ip_edit'] ?? '');
+            if ($customIp !== '' && !filter_var($customIp, FILTER_VALIDATE_IP)) {
+                $msg = 'Indirizzo IP non valido.';
+                $msgType = 'danger';
+            } else {
+                if ($customIp !== '') {
+                    $stmt2 = $db->prepare("SELECT ip_address FROM hosts WHERE id = ? AND user_id = ?");
+                    $stmt2->execute([$hostId, $user['id']]);
+                    $oldHost = $stmt2->fetch();
+                    $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+                    $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ?, ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
+                       ->execute([$newHostname, $newDomainId, $customIp, $hostId, $user['id']]);
+                    $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
+                       ->execute([$hostId, $oldHost['ip_address'] ?? '', $customIp, $clientIp]);
+                } else {
+                    $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ? WHERE id = ? AND user_id = ?")
+                       ->execute([$newHostname, $newDomainId, $hostId, $user['id']]);
+                }
+                $msg = 'Host aggiornato.';
+                $msgType = 'success';
+            }
         }
     }
 }
