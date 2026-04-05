@@ -16,10 +16,11 @@ define('APP_VERSION', '1.0');
 define('APP_BUILD', 9);
 
 // Integrazione Plesk DNS API
-// La chiave va messa nel file .env (non versionato)
+// Credenziali nel file .env (non versionato)
 $_env = is_file(__DIR__ . '/.env') ? parse_ini_file(__DIR__ . '/.env') : [];
 define('PLESK_HOST',       'https://plesk.gvweb.it:8443');
-define('PLESK_API_KEY',    $_env['PLESK_API_KEY'] ?? '');
+define('PLESK_USER',       $_env['PLESK_USER']     ?? 'admin');
+define('PLESK_PASSWORD',   $_env['PLESK_PASSWORD'] ?? '');
 define('PLESK_VERIFY_SSL', false);
 unset($_env);
 
