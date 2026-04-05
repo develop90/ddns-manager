@@ -375,5 +375,8 @@ document.querySelectorAll('.form-update-ip').forEach(form => {
     });
 });
 </script>
+<footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
+    <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
+</footer>
 </body>
 </html>
