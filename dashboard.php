@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/plesk.php';
 requireLogin();
 
 $db = getDb();
@@ -40,8 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_h
 // Elimina host
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_host') {
     $hostId = (int)($_POST['host_id'] ?? 0);
-    $stmt = $db->prepare("DELETE FROM hosts WHERE id = ? AND user_id = ?");
-    $stmt->execute([$hostId, $user['id']]);
+    $stmtDel = $db->prepare("SELECT h.hostname, d.zone FROM hosts h JOIN domains d ON h.domain_id = d.id WHERE h.id = ? AND h.user_id = ?");
+    $stmtDel->execute([$hostId, $user['id']]);
+    $toDelete = $stmtDel->fetch();
+    $db->prepare("DELETE FROM hosts WHERE id = ? AND user_id = ?")->execute([$hostId, $user['id']]);
+    if ($toDelete) pleskDnsDelete($toDelete['hostname'], $toDelete['zone']);
     $msg = 'Host eliminato.';
     $msgType = 'success';
 }
@@ -65,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
                ->execute([$newIp, $hostId]);
             $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
                ->execute([$hostId, $host['ip_address'], $newIp, $clientIp]);
+            $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
+            $zoneStmt->execute([$host['domain_id']]);
+            pleskDnsUpdate($host['hostname'], $zoneStmt->fetchColumn(), $newIp);
             $msg = 'IP aggiornato a ' . $newIp;
             $msgType = 'success';
         }
@@ -102,6 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
                        ->execute([$newHostname, $newDomainId, $customIp, $hostId, $user['id']]);
                     $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
                        ->execute([$hostId, $oldHost['ip_address'] ?? '', $customIp, $clientIp]);
+                    $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
+                    $zoneStmt->execute([$newDomainId]);
+                    pleskDnsUpdate($newHostname, $zoneStmt->fetchColumn(), $customIp);
                 } else {
                     $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ? WHERE id = ? AND user_id = ?")
                        ->execute([$newHostname, $newDomainId, $hostId, $user['id']]);

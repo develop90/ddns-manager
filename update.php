@@ -20,8 +20,8 @@
  */
 
 // Non servono sessioni per l'API
-require_once __DIR__ . '/db.php';
-define('DB_PATH', __DIR__ . '/data/ddns.sqlite');
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/plesk.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
@@ -140,5 +140,7 @@ $db->prepare("UPDATE hosts SET ip_address = ?, last_update = CURRENT_TIMESTAMP W
 
 $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
     ->execute([$host['id'], $oldIp, $myip, $clientIp]);
+
+pleskDnsUpdate($hostPart, $domain['zone'], $myip);
 
 echo 'good ' . $myip;
