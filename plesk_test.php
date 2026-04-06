@@ -5,6 +5,13 @@ requireAdmin();
 header('Content-Type: text/plain; charset=utf-8');
 
 echo "=== Plesk DNS Test ===\n\n";
+$envPath = __DIR__ . '/.env';
+echo ".env cercato in: $envPath\n";
+echo ".env esiste:     " . (file_exists($envPath) ? 'SI' : 'NO - file non trovato!') . "\n";
+if (file_exists($envPath)) {
+    echo ".env contenuto:  " . file_get_contents($envPath) . "\n";
+}
+echo "\n";
 echo "PLESK_HOST:     " . PLESK_HOST . "\n";
 echo "PLESK_USER:     " . PLESK_USER . "\n";
 echo "PLESK_PASSWORD: " . (PLESK_PASSWORD !== '' ? str_repeat('*', strlen(PLESK_PASSWORD)) : '(vuota!)') . "\n";
