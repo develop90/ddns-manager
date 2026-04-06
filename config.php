@@ -21,6 +21,7 @@ $_env = is_file(__DIR__ . '/.env') ? parse_ini_file(__DIR__ . '/.env') : [];
 define('PLESK_HOST',       'https://plesk.gvweb.it:8443');
 define('PLESK_USER',       $_env['PLESK_USER']     ?? 'admin');
 define('PLESK_PASSWORD',   $_env['PLESK_PASSWORD'] ?? '');
+define('PLESK_DOMAIN',     $_env['PLESK_DOMAIN']   ?? ''); // zona gestita da Plesk (es. gvweb.it)
 define('PLESK_VERIFY_SSL', false);
 unset($_env);
 

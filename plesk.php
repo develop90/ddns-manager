@@ -22,11 +22,14 @@ function _pleskCurl(string $url, array $opts): array {
 function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
     if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
 
+    // domainName = zona che Plesk gestisce (es. gvweb.it)
+    // host = FQDN completo del record (es. casa.ddns.gvweb.it.)
+    $pleskDomain = (defined('PLESK_DOMAIN') && PLESK_DOMAIN !== '') ? PLESK_DOMAIN : $zone;
     $fqdn = $hostname . '.' . $zone . '.';
     $base = rtrim(PLESK_HOST, '/') . '/api/v2/dns/records';
 
-    // Cerca record A esistente nella zona
-    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $zone]), []);
+    // Cerca record A esistente nella zona Plesk
+    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $pleskDomain]), []);
     $records = json_decode($resp ?: '[]', true) ?? [];
 
     $existingId = null;
@@ -46,7 +49,7 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
         [$code] = _pleskCurl($base, [
             CURLOPT_POST       => true,
             CURLOPT_POSTFIELDS => json_encode([
-                'domainName' => $zone,
+                'domainName' => $pleskDomain,
                 'type'       => 'A',
                 'host'       => $fqdn,
                 'value'      => $ip,
@@ -65,10 +68,11 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
 function pleskDnsDelete(string $hostname, string $zone): bool {
     if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
 
+    $pleskDomain = (defined('PLESK_DOMAIN') && PLESK_DOMAIN !== '') ? PLESK_DOMAIN : $zone;
     $fqdn = $hostname . '.' . $zone;
     $base = rtrim(PLESK_HOST, '/') . '/api/v2/dns/records';
 
-    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $zone]), []);
+    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $pleskDomain]), []);
     $records = json_decode($resp ?: '[]', true) ?? [];
 
     foreach ($records as $rec) {
