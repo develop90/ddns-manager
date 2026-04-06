@@ -36,7 +36,8 @@ body {
     min-width: 80px;
     border: 1px solid transparent;
 }
-.navbar nav a .nav-icon { font-size: 1.6rem; line-height: 1; }
+.navbar nav a .nav-icon { width: 28px; height: 28px; display: block; }
+.navbar nav a .nav-icon svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .navbar nav a .nav-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .navbar nav a:hover, .navbar nav a.active {
     color: #e2e8f0;
