@@ -7,6 +7,7 @@ function _pleskCurl(string $url, array $opts): array {
         CURLOPT_USERPWD        => PLESK_USER . ':' . PLESK_PASSWORD,
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
         CURLOPT_SSL_VERIFYPEER => PLESK_VERIFY_SSL,
+        CURLOPT_SSL_VERIFYHOST => PLESK_VERIFY_SSL ? 2 : 0,
         CURLOPT_TIMEOUT        => 10,
     ]);
     $resp = curl_exec($ch);
