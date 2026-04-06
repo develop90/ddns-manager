@@ -17,20 +17,31 @@ function _pleskCurl(string $url, array $opts): array {
 }
 
 /**
+ * Recupera l'ID Plesk del dominio PLESK_DOMAIN. Risultato in cache statica.
+ */
+function _pleskDomainId(): ?int {
+    static $id = false;
+    if ($id !== false) return $id;
+    if (!defined('PLESK_DOMAIN') || PLESK_DOMAIN === '') return $id = null;
+    [, $resp] = _pleskCurl(rtrim(PLESK_HOST, '/') . '/api/v2/domains', []);
+    foreach (json_decode($resp ?: '[]', true) ?? [] as $d) {
+        if (($d['name'] ?? '') === PLESK_DOMAIN) return $id = (int)$d['id'];
+    }
+    return $id = null;
+}
+
+/**
  * Crea o aggiorna il record A su Plesk DNS per hostname.zone → ip.
- * Non fa nulla se PLESK_PASSWORD è vuota.
  */
 function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
     if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
+    $domainId = _pleskDomainId();
+    if (!$domainId) return false;
 
-    // domainName = zona che Plesk gestisce (es. gvweb.it)
-    // host = FQDN completo del record (es. casa.ddns.gvweb.it.)
-    $pleskDomain = (defined('PLESK_DOMAIN') && PLESK_DOMAIN !== '') ? PLESK_DOMAIN : $zone;
     $fqdn = $hostname . '.' . $zone . '.';
     $base = rtrim(PLESK_HOST, '/') . '/api/v2/dns/records';
 
-    // Cerca record A esistente nella zona Plesk
-    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $pleskDomain]), []);
+    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainId' => $domainId]), []);
     $records = json_decode($resp ?: '[]', true) ?? [];
 
     $existingId = null;
@@ -50,11 +61,11 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
         [$code] = _pleskCurl($base, [
             CURLOPT_POST       => true,
             CURLOPT_POSTFIELDS => json_encode([
-                'domainName' => $pleskDomain,
-                'type'       => 'A',
-                'host'       => $fqdn,
-                'value'      => $ip,
-                'ttl'        => DEFAULT_TTL,
+                'domainId' => $domainId,
+                'type'     => 'A',
+                'host'     => $fqdn,
+                'value'    => $ip,
+                'ttl'      => DEFAULT_TTL,
             ]),
         ]);
     }
@@ -64,23 +75,21 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
 
 /**
  * Elimina il record A su Plesk DNS per hostname.zone.
- * Non fa nulla se PLESK_PASSWORD è vuota o il record non esiste.
  */
 function pleskDnsDelete(string $hostname, string $zone): bool {
     if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
+    $domainId = _pleskDomainId();
+    if (!$domainId) return false;
 
-    $pleskDomain = (defined('PLESK_DOMAIN') && PLESK_DOMAIN !== '') ? PLESK_DOMAIN : $zone;
     $fqdn = $hostname . '.' . $zone;
     $base = rtrim(PLESK_HOST, '/') . '/api/v2/dns/records';
 
-    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainName' => $pleskDomain]), []);
+    [$code, $resp] = _pleskCurl($base . '?' . http_build_query(['domainId' => $domainId]), []);
     $records = json_decode($resp ?: '[]', true) ?? [];
 
     foreach ($records as $rec) {
         if ($rec['type'] === 'A' && rtrim($rec['host'], '.') === $fqdn) {
-            [$code] = _pleskCurl($base . '/' . $rec['id'], [
-                CURLOPT_CUSTOMREQUEST => 'DELETE',
-            ]);
+            [$code] = _pleskCurl($base . '/' . $rec['id'], [CURLOPT_CUSTOMREQUEST => 'DELETE']);
             return $code >= 200 && $code < 300;
         }
     }
