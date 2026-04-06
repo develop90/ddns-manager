@@ -276,7 +276,7 @@ $recentLogs = $db->query("
         <?php else: ?>
             <table>
                 <thead>
-                    <tr><th>Host</th><th>IP precedente</th><th>Nuovo IP</th><th>Sorgente</th><th>Data</th></tr>
+                    <tr><th>Host</th><th>IP precedente</th><th>Nuovo IP</th><th>Tipo</th><th>Sorgente</th><th>Data</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($recentLogs as $log): ?>
@@ -284,6 +284,7 @@ $recentLogs = $db->query("
                         <td><?= htmlspecialchars($log['hostname'] . '.' . $log['zone']) ?></td>
                         <td><span class="ip-badge"><?= htmlspecialchars($log['old_ip'] ?: '-') ?></span></td>
                         <td><span class="ip-badge"><?= htmlspecialchars($log['new_ip']) ?></span></td>
+                        <td><?= htmlspecialchars($log['source_type'] ?: '-') ?></td>
                         <td class="text-muted"><?= htmlspecialchars($log['source_ip']) ?></td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($log['updated_at'])) ?></td>
                     </tr>

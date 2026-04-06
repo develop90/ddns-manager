@@ -67,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         if ($host) {
             $db->prepare("UPDATE hosts SET ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ?")
                ->execute([$newIp, $hostId]);
-            $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
-               ->execute([$hostId, $host['ip_address'], $newIp, $clientIp]);
+            $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+               ->execute([$hostId, $host['ip_address'], $newIp, $clientIp, 'Dashboard']);
             $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
             $zoneStmt->execute([$host['domain_id']]);
             pleskDnsUpdate($host['hostname'], $zoneStmt->fetchColumn(), $newIp);
@@ -107,8 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
                     $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
                     $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ?, ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
                        ->execute([$newHostname, $newDomainId, $customIp, $hostId, $user['id']]);
-                    $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
-                       ->execute([$hostId, $oldHost['ip_address'] ?? '', $customIp, $clientIp]);
+                    $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+                       ->execute([$hostId, $oldHost['ip_address'] ?? '', $customIp, $clientIp, 'Modifica']);
                     $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
                     $zoneStmt->execute([$newDomainId]);
                     pleskDnsUpdate($newHostname, $zoneStmt->fetchColumn(), $customIp);

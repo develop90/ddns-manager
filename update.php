@@ -138,8 +138,8 @@ if ($oldIp === $myip) {
 $db->prepare("UPDATE hosts SET ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ?")
     ->execute([$myip, $host['id']]);
 
-$db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
-    ->execute([$host['id'], $oldIp, $myip, $clientIp]);
+$db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+    ->execute([$host['id'], $oldIp, $myip, $clientIp, 'Router / API']);
 
 pleskDnsUpdate($hostPart, $domain['zone'], $myip);
 

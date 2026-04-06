@@ -57,10 +57,13 @@ function getDb(): PDO {
             old_ip TEXT,
             new_ip TEXT,
             source_ip TEXT,
+            source_type TEXT DEFAULT '',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )
     ");
+    // Migrazione: aggiunge source_type se non esiste (DB già esistente)
+    try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
 
     // Crea admin di default se non esiste
     $stmt = $pdo->query("SELECT COUNT(*) as c FROM users");
