@@ -55,6 +55,30 @@ if ($code === 200) {
     exit;
 }
 
+// Test 1b: lista tutti i domini in Plesk
+echo "\n--- Test 1b: domini registrati in Plesk ---\n";
+$ch = curl_init(rtrim(PLESK_HOST, '/') . '/api/v2/domains');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_USERPWD        => PLESK_USER . ':' . PLESK_PASSWORD,
+    CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+    CURLOPT_SSL_VERIFYPEER => PLESK_VERIFY_SSL,
+    CURLOPT_SSL_VERIFYHOST => PLESK_VERIFY_SSL ? 2 : 0,
+    CURLOPT_TIMEOUT        => 10,
+]);
+$resp = curl_exec($ch);
+$code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+echo "HTTP: $code\n";
+$domains = json_decode($resp, true);
+if (is_array($domains)) {
+    foreach ($domains as $d) {
+        echo "  - " . ($d['name'] ?? '?') . " (id=" . ($d['id'] ?? '?') . ")\n";
+    }
+} else {
+    echo "Risposta: $resp\n";
+}
+
 // Test 2: lista record DNS della zona
 echo "\n--- Test 2: record DNS di " . PLESK_DOMAIN . " ---\n";
 $ch = curl_init(rtrim(PLESK_HOST, '/') . '/api/v2/dns/records?' . http_build_query(['domainName' => PLESK_DOMAIN]));
