@@ -26,22 +26,23 @@ function pleskXml(string $xml, array $sslOpts, string $base): string {
     return $resp;
 }
 
-// Test 1: lista record con site-id=1
-echo "--- XML get_rec site-id=1 (gvweb.it) ---\n";
-$resp = pleskXml('<?xml version="1.0"?><packet><dns><get_rec><filter><site-id>1</site-id></filter></get_rec></dns></packet>', $sslOpts, $base);
-echo substr($resp, 0, 800) . "\n";
-
-// Test 2: lista record con site-id=9
-echo "\n--- XML get_rec site-id=9 (ddns.gvweb.it) ---\n";
-$resp = pleskXml('<?xml version="1.0"?><packet><dns><get_rec><filter><site-id>9</site-id></filter></get_rec></dns></packet>', $sslOpts, $base);
-echo substr($resp, 0, 800) . "\n";
-
-// Test 3: add_rec senza ttl, site-id=1
-echo "\n--- XML add_rec test-ddns.ddns.gvweb.it site-id=1 (senza ttl) ---\n";
-$resp = pleskXml('<?xml version="1.0"?><packet><dns><add_rec><site-id>1</site-id><type>A</type><host>test-ddns.ddns.gvweb.it.</host><value>1.2.3.4</value></add_rec></dns></packet>', $sslOpts, $base);
+// Test: add_rec con solo hostname relativo (site-id=9, host="test-ddns")
+echo "--- XML add_rec host=test-ddns site-id=9 ---\n";
+$resp = pleskXml('<?xml version="1.0"?><packet><dns><add_rec><site-id>9</site-id><type>A</type><host>test-ddns</host><value>1.2.3.4</value></add_rec></dns></packet>', $sslOpts, $base);
 echo "$resp\n";
 
-// Test 4: add_rec senza ttl, site-id=9
-echo "\n--- XML add_rec test-ddns.ddns.gvweb.it site-id=9 (senza ttl) ---\n";
-$resp = pleskXml('<?xml version="1.0"?><packet><dns><add_rec><site-id>9</site-id><type>A</type><host>test-ddns.ddns.gvweb.it.</host><value>1.2.3.4</value></add_rec></dns></packet>', $sslOpts, $base);
-echo "$resp\n";
+// Estrai id dal risultato
+preg_match('/<id>(\d+)<\/id>/', $resp, $m);
+$newId = $m[1] ?? null;
+
+if ($newId && strpos($resp, '<status>ok</status>') !== false) {
+    echo "\n=== FUNZIONA! record creato con id=$newId ===\n";
+    echo "Il record sara' test-ddns.ddns.gvweb.it → 1.2.3.4\n";
+
+    // Elimina record di test
+    echo "\n--- Elimino record di test (id=$newId) ---\n";
+    $resp = pleskXml('<?xml version="1.0"?><packet><dns><del_rec><filter><id>' . $newId . '</id></filter></del_rec></dns></packet>', $sslOpts, $base);
+    echo "$resp\n";
+} else {
+    echo "ERRORE - provo con host relativo diverso...\n";
+}
