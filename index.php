@@ -17,13 +17,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
+    $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+    if (strpos($clientIp, ',') !== false) $clientIp = trim(explode(',', $clientIp)[0]);
+
     if ($user && password_verify($password, $user['password'])) {
+        $db->prepare("INSERT INTO login_log (username, ip, success) VALUES (?, ?, 1)")
+           ->execute([$username, $clientIp]);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         $_SESSION['is_admin'] = $user['is_admin'];
         header('Location: ' . BASE_URL . '/dashboard.php');
         exit;
     } else {
+        $db->prepare("INSERT INTO login_log (username, ip, success) VALUES (?, ?, 0)")
+           ->execute([$username, $clientIp]);
         $error = 'Credenziali non valide.';
     }
 }

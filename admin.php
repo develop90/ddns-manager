@@ -123,6 +123,9 @@ $recentLogs = $db->query("
     ORDER BY l.updated_at DESC
     LIMIT 20
 ")->fetchAll();
+$loginLogs = $db->query("
+    SELECT * FROM login_log ORDER BY logged_at DESC LIMIT 50
+")->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -266,6 +269,36 @@ $recentLogs = $db->query("
                 <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+
+    <!-- Log login -->
+    <div class="card">
+        <h2>Log accessi</h2>
+        <?php if (empty($loginLogs)): ?>
+            <p class="text-muted">Nessun accesso registrato.</p>
+        <?php else: ?>
+            <table>
+                <thead>
+                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Data</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($loginLogs as $ll): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($ll['username']) ?></td>
+                        <td class="text-muted"><?= htmlspecialchars($ll['ip']) ?></td>
+                        <td>
+                            <?php if ($ll['success']): ?>
+                                <span style="color:#86efac">✓ Successo</span>
+                            <?php else: ?>
+                                <span style="color:#fca5a5">✗ Fallito</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
     </div>
 
     <!-- Log aggiornamenti -->

@@ -65,6 +65,16 @@ function getDb(): PDO {
     // Migrazione: aggiunge source_type se non esiste (DB già esistente)
     try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
 
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS login_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            ip TEXT,
+            success INTEGER DEFAULT 0,
+            logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
     // Crea admin di default se non esiste
     $stmt = $pdo->query("SELECT COUNT(*) as c FROM users");
     if ($stmt->fetch()['c'] == 0) {
