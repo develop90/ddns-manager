@@ -121,8 +121,8 @@ class TestUpdateEndpoint:
 
     def test_unknown_host_returns_nohost(self):
         r = requests.get(f"{BASE_URL}/nic/update",
-                         params={"hostname": "nonexistent.ddns.gvweb.it", "myip": "1.2.3.4"},
-                         auth=(TEST_USER, TEST_PASS),
+                         params={"hostname": "nonexistent-xyz-123.ddns.gvweb.it", "myip": "1.2.3.4"},
+                         auth=(ADMIN_USER, ADMIN_PASS),
                          verify=False)
         assert "nohost" in r.text
 
