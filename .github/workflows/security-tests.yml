@@ -5,6 +5,9 @@ on:
     branches: [master]
   workflow_dispatch:   # esecuzione manuale dal sito GitHub
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -16,17 +19,11 @@ jobs:
 
       - name: Unblock runner IP before tests
         env:
-          DDNS_ADMIN_PASS: ${{ secrets.DDNS_ADMIN_PASS }}
+          UNBLOCK_SECRET: ${{ secrets.UNBLOCK_SECRET }}
         run: |
-          # Login come admin e sblocca l'IP corrente
           RUNNER_IP=$(curl -s https://api.ipify.org)
           echo "Runner IP: $RUNNER_IP"
-          SESSION=$(curl -s -c /tmp/cookies.txt -b /tmp/cookies.txt \
-            -d "username=admin&password=$DDNS_ADMIN_PASS" \
-            -L https://ddns.gvweb.it/index.php -o /dev/null -w "%{http_code}")
-          curl -s -c /tmp/cookies.txt -b /tmp/cookies.txt \
-            -d "action=unblock_ip&ip=$RUNNER_IP" \
-            https://ddns.gvweb.it/admin.php > /dev/null
+          curl -sf "https://ddns.gvweb.it/unblock.php?secret=$UNBLOCK_SECRET&ip=$RUNNER_IP"
           echo "IP sbloccato: $RUNNER_IP"
 
       - name: Run security tests

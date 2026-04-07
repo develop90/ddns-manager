@@ -13,7 +13,7 @@ define('DEFAULT_TTL', 300);
 
 // Versione applicazione
 define('APP_VERSION', '1.0');
-define('APP_BUILD', 11);
+define('APP_BUILD', 12);
 
 // Integrazione Plesk DNS API
 // Credenziali nel file .env (non versionato)
@@ -23,6 +23,7 @@ define('PLESK_USER',       $_env['PLESK_USER']     ?? 'admin');
 define('PLESK_PASSWORD',   $_env['PLESK_PASSWORD'] ?? '');
 define('PLESK_DOMAIN',     $_env['PLESK_DOMAIN']   ?? ''); // zona gestita da Plesk (es. gvweb.it)
 define('PLESK_VERIFY_SSL', false);
+define('UNBLOCK_SECRET',   $_env['UNBLOCK_SECRET'] ?? '');
 unset($_env);
 
 // Autoload database
