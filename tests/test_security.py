@@ -8,7 +8,17 @@ Requisiti:  pip install pytest requests
 
 import pytest
 import requests
-from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS
+from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS, UNBLOCK_SECRET
+
+def _unblock_my_ip():
+    """Sblocca l'IP corrente tramite l'endpoint segreto."""
+    try:
+        my_ip = requests.get("https://api.ipify.org", verify=False, timeout=5).text.strip()
+        requests.get(f"{BASE_URL}/unblock.php",
+                     params={"secret": UNBLOCK_SECRET, "ip": my_ip},
+                     verify=False, timeout=5)
+    except Exception:
+        pass
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -63,6 +73,8 @@ class TestAuth:
         r = s.post(f"{BASE_URL}/index.php",
                    data={"username": TEST_USER, "password": "WRONG"})
         assert "Troppi tentativi" in r.text
+        # Sblocca l'IP così i test successivi possono loggarsi
+        _unblock_my_ip()
 
 # ── 2. Autorizzazione ──────────────────────────────────────────────────────────
 
