@@ -12,9 +12,12 @@ from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+TEST_IP = "192.168.99.1"   # IP finto stabile per tutti i test (non blocca il runner reale)
+
 def session_login(username, password):
     s = requests.Session()
     s.verify = False
+    s.headers["X-Forwarded-For"] = TEST_IP
     r = s.post(f"{BASE_URL}/index.php",
                data={"username": username, "password": password},
                allow_redirects=True)

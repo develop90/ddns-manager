@@ -3,7 +3,7 @@ name: Security Tests
 on:
   push:
     branches: [master]
-  workflow_dispatch:   # esecuzione manuale dal sito GitHub
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -17,31 +17,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r tests/requirements.txt
 
-      - name: Whitelist runner IP
-        env:
-          UNBLOCK_SECRET: ${{ secrets.UNBLOCK_SECRET }}
-        run: |
-          RUNNER_IP=$(curl -s https://api.ipify.org)
-          echo "Runner IP: $RUNNER_IP"
-          curl -s "https://ddns.gvweb.it/unblock.php?secret=$UNBLOCK_SECRET&ip=$RUNNER_IP&action=whitelist_add"
-          echo "IP whitelistato: $RUNNER_IP"
-
       - name: Run security tests
         env:
           DDNS_ADMIN_PASS: ${{ secrets.DDNS_ADMIN_PASS }}
           DDNS_TEST_PASS: ${{ secrets.DDNS_TEST_PASS }}
-          UNBLOCK_SECRET: ${{ secrets.UNBLOCK_SECRET }}
         run: |
           cd tests
           sed -i "s/la-tua-password-admin/$DDNS_ADMIN_PASS/" config.py
           sed -i "s/test10/$DDNS_TEST_PASS/" config.py
           pytest test_security.py -v --tb=short
-
-      - name: Remove runner IP from whitelist
-        if: always()
-        env:
-          UNBLOCK_SECRET: ${{ secrets.UNBLOCK_SECRET }}
-        run: |
-          RUNNER_IP=$(curl -s https://api.ipify.org)
-          curl -s "https://ddns.gvweb.it/unblock.php?secret=$UNBLOCK_SECRET&ip=$RUNNER_IP&action=whitelist_remove"
-          echo "IP rimosso dalla whitelist: $RUNNER_IP"
