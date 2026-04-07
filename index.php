@@ -8,11 +8,6 @@ if (isLoggedIn()) {
 
 $error = '';
 
-// Limiti brute force
-define('BF_MAX_ATTEMPTS', 5);   // tentativi falliti massimi
-define('BF_WINDOW_MIN',  10);   // finestra temporale in minuti
-define('BF_LOCKOUT_MIN', 15);   // blocco in minuti dopo superamento soglia
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -22,17 +17,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
     if (strpos($clientIp, ',') !== false) $clientIp = trim(explode(',', $clientIp)[0]);
 
-    // Controlla tentativi falliti recenti da questo IP
-    $stmtBf = $db->prepare("
-        SELECT COUNT(*) as c FROM login_log
-        WHERE ip = ? AND success = 0
-        AND logged_at >= datetime('now', ? || ' minutes')
-    ");
-    $stmtBf->execute([$clientIp, '-' . BF_WINDOW_MIN]);
+    $getSetting = fn($k) => $db->prepare("SELECT value FROM settings WHERE key=?")->execute([$k]) ?
+                            (int)$db->prepare("SELECT value FROM settings WHERE key=?")->execute([$k]) : 5;
+    $bfMax     = (int)$db->query("SELECT value FROM settings WHERE key='bf_max_attempts'")->fetchColumn();
+    $bfWindow  = (int)$db->query("SELECT value FROM settings WHERE key='bf_window_min'")->fetchColumn();
+    $bfLockout = (int)$db->query("SELECT value FROM settings WHERE key='bf_lockout_min'")->fetchColumn();
+
+    $stmtBf = $db->prepare("SELECT COUNT(*) as c FROM login_log WHERE ip=? AND success=0 AND logged_at >= datetime('now', ? || ' minutes')");
+    $stmtBf->execute([$clientIp, '-' . $bfWindow]);
     $failCount = (int)$stmtBf->fetch()['c'];
 
-    if ($failCount >= BF_MAX_ATTEMPTS) {
-        $error = "Troppi tentativi falliti. Riprova tra " . BF_LOCKOUT_MIN . " minuti.";
+    if ($failCount >= $bfMax) {
+        $error = "Troppi tentativi falliti. Riprova tra $bfLockout minuti.";
     } else {
         $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");
         $stmt->execute([$username]);
@@ -49,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $db->prepare("INSERT INTO login_log (username, ip, success) VALUES (?, ?, 0)")
                ->execute([$username, $clientIp]);
-            $remaining = BF_MAX_ATTEMPTS - $failCount - 1;
+            $remaining = $bfMax - $failCount - 1;
             $error = 'Credenziali non valide.' . ($remaining > 0 ? " Tentativi rimasti: $remaining." : ' Account bloccato temporaneamente.');
         }
     }

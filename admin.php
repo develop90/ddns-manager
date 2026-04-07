@@ -112,6 +112,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     }
 }
 
+// Salva impostazioni brute force
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_settings') {
+    foreach (['bf_max_attempts','bf_window_min','bf_lockout_min'] as $k) {
+        $v = max(1, (int)($_POST[$k] ?? 1));
+        $db->prepare("UPDATE settings SET value=? WHERE key=?")->execute([$v, $k]);
+    }
+    $msg = 'Impostazioni salvate.'; $msgType = 'success';
+}
+
+// Sblocca IP
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unblock_ip') {
+    $ip = $_POST['ip'] ?? '';
+    $db->prepare("DELETE FROM login_log WHERE ip=? AND success=0")->execute([$ip]);
+    $msg = "IP $ip sbloccato."; $msgType = 'success';
+}
+
 // Carica dati
 $domains = $db->query("SELECT d.*, COUNT(h.id) as host_count FROM domains d LEFT JOIN hosts h ON h.domain_id = d.id GROUP BY d.id ORDER BY d.zone")->fetchAll();
 $users = $db->query("SELECT u.*, COUNT(h.id) as host_count FROM users u LEFT JOIN hosts h ON h.user_id = u.id GROUP BY u.id ORDER BY u.username")->fetchAll();
@@ -123,6 +139,7 @@ $recentLogs = $db->query("
     ORDER BY l.updated_at DESC
     LIMIT 20
 ")->fetchAll();
+$bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
 $loginLogs = $db->query("
     SELECT *,
         (SELECT COUNT(*) FROM login_log l2
@@ -275,6 +292,27 @@ $loginLogs = $db->query("
         </table>
     </div>
 
+    <!-- Impostazioni Brute Force -->
+    <div class="card">
+        <h2>Protezione Brute Force</h2>
+        <form method="POST" class="form-inline">
+            <input type="hidden" name="action" value="save_settings">
+            <div class="form-group">
+                <label>Max tentativi falliti</label>
+                <input type="number" name="bf_max_attempts" value="<?= (int)($bfSettings['bf_max_attempts'] ?? 5) ?>" min="1" style="width:80px">
+            </div>
+            <div class="form-group">
+                <label>Finestra (minuti)</label>
+                <input type="number" name="bf_window_min" value="<?= (int)($bfSettings['bf_window_min'] ?? 10) ?>" min="1" style="width:80px">
+            </div>
+            <div class="form-group">
+                <label>Blocco (minuti)</label>
+                <input type="number" name="bf_lockout_min" value="<?= (int)($bfSettings['bf_lockout_min'] ?? 15) ?>" min="1" style="width:80px">
+            </div>
+            <button type="submit" class="btn btn-primary" style="align-self:end">Salva</button>
+        </form>
+    </div>
+
     <!-- Log login -->
     <div class="card">
         <h2>Log accessi</h2>
@@ -283,7 +321,7 @@ $loginLogs = $db->query("
         <?php else: ?>
             <table>
                 <thead>
-                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Tentativi falliti (10 min)</th><th>Data</th></tr>
+                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Tentativi falliti</th><th>Data</th><th></th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($loginLogs as $ll): ?>
@@ -304,6 +342,15 @@ $loginLogs = $db->query("
                             </span>
                         </td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
+                        <td>
+                            <?php if ((int)$ll['recent_failures'] >= (int)($bfSettings['bf_max_attempts'] ?? 5)): ?>
+                            <form method="POST" style="display:inline">
+                                <input type="hidden" name="action" value="unblock_ip">
+                                <input type="hidden" name="ip" value="<?= htmlspecialchars($ll['ip']) ?>">
+                                <button class="btn btn-sm btn-success">Sblocca</button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
