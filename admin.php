@@ -124,7 +124,11 @@ $recentLogs = $db->query("
     LIMIT 20
 ")->fetchAll();
 $loginLogs = $db->query("
-    SELECT * FROM login_log ORDER BY logged_at DESC LIMIT 50
+    SELECT *,
+        (SELECT COUNT(*) FROM login_log l2
+         WHERE l2.ip = login_log.ip AND l2.success = 0
+         AND l2.logged_at >= datetime('now', '-10 minutes')) as recent_failures
+    FROM login_log ORDER BY logged_at DESC LIMIT 50
 ")->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -279,7 +283,7 @@ $loginLogs = $db->query("
         <?php else: ?>
             <table>
                 <thead>
-                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Data</th></tr>
+                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Tentativi falliti (10 min)</th><th>Data</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($loginLogs as $ll): ?>
@@ -292,6 +296,12 @@ $loginLogs = $db->query("
                             <?php else: ?>
                                 <span style="color:#fca5a5">✗ Fallito</span>
                             <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php $f = (int)$ll['recent_failures']; ?>
+                            <span style="color:<?= $f >= 5 ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
+                                <?= $f ?><?= $f >= 5 ? ' 🔒 bloccato' : '' ?>
+                            </span>
                         </td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
                     </tr>
