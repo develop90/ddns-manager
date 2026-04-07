@@ -1,0 +1,24 @@
+name: Security Tests
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:   # esecuzione manuale dal sito GitHub
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run security tests
+        env:
+          DDNS_ADMIN_PASS: ${{ secrets.DDNS_ADMIN_PASS }}
+        run: |
+          cd tests
+          # Sostituisce la password admin dal secret GitHub
+          sed -i "s/la-tua-password-admin/$DDNS_ADMIN_PASS/" config.py
+          pytest test_security.py -v --tb=short
