@@ -19,15 +19,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $getSetting = fn($k) => $db->prepare("SELECT value FROM settings WHERE key=?")->execute([$k]) ?
                             (int)$db->prepare("SELECT value FROM settings WHERE key=?")->execute([$k]) : 5;
-    $bfMax     = (int)$db->query("SELECT value FROM settings WHERE key='bf_max_attempts'")->fetchColumn();
-    $bfWindow  = (int)$db->query("SELECT value FROM settings WHERE key='bf_window_min'")->fetchColumn();
-    $bfLockout = (int)$db->query("SELECT value FROM settings WHERE key='bf_lockout_min'")->fetchColumn();
+    $bfMax      = (int)$db->query("SELECT value FROM settings WHERE key='bf_max_attempts'")->fetchColumn();
+    $bfWindow   = (int)$db->query("SELECT value FROM settings WHERE key='bf_window_min'")->fetchColumn();
+    $bfLockout  = (int)$db->query("SELECT value FROM settings WHERE key='bf_lockout_min'")->fetchColumn();
+    $whitelist  = array_filter(array_map('trim', explode(',',
+                    $db->query("SELECT value FROM settings WHERE key='bf_whitelist'")->fetchColumn() ?: '')));
 
     $stmtBf = $db->prepare("SELECT COUNT(*) as c FROM login_log WHERE ip=? AND success=0 AND logged_at >= datetime('now', ? || ' minutes')");
     $stmtBf->execute([$clientIp, '-' . $bfWindow]);
     $failCount = (int)$stmtBf->fetch()['c'];
 
-    if ($failCount >= $bfMax) {
+    if (!in_array($clientIp, $whitelist) && $failCount >= $bfMax) {
         $error = "Troppi tentativi falliti. Riprova tra $bfLockout minuti.";
     } else {
         $stmt = $db->prepare("SELECT * FROM users WHERE username = ?");

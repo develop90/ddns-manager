@@ -26,7 +26,26 @@ if (!filter_var($ip, FILTER_VALIDATE_IP)) {
     exit('invalid ip');
 }
 
-$db = getDb();
-$db->prepare("DELETE FROM login_log WHERE ip = ? AND success = 0")->execute([$ip]);
+$db     = getDb();
+$action = $_GET['action'] ?? 'unblock';
+
+if ($action === 'whitelist_add') {
+    $current = array_filter(array_map('trim', explode(',',
+        $db->query("SELECT value FROM settings WHERE key='bf_whitelist'")->fetchColumn() ?: '')));
+    if (!in_array($ip, $current)) {
+        $current[] = $ip;
+    }
+    $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('bf_whitelist', ?)")
+       ->execute([implode(',', $current)]);
+} elseif ($action === 'whitelist_remove') {
+    $current = array_filter(array_map('trim', explode(',',
+        $db->query("SELECT value FROM settings WHERE key='bf_whitelist'")->fetchColumn() ?: '')));
+    $current = array_filter($current, fn($x) => $x !== $ip);
+    $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('bf_whitelist', ?)")
+       ->execute([implode(',', $current)]);
+} else {
+    // default: sblocca (elimina i log falliti)
+    $db->prepare("DELETE FROM login_log WHERE ip = ? AND success = 0")->execute([$ip]);
+}
 
 echo 'ok';

@@ -8,17 +8,7 @@ Requisiti:  pip install pytest requests
 
 import pytest
 import requests
-from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS, UNBLOCK_SECRET
-
-def _unblock_my_ip():
-    """Sblocca l'IP corrente tramite l'endpoint segreto."""
-    try:
-        my_ip = requests.get("https://api.ipify.org", verify=False, timeout=5).text.strip()
-        requests.get(f"{BASE_URL}/unblock.php",
-                     params={"secret": UNBLOCK_SECRET, "ip": my_ip},
-                     verify=False, timeout=5)
-    except Exception:
-        pass
+from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -63,18 +53,16 @@ class TestAuth:
         assert r.status_code in (301, 302)
 
     def test_brute_force_lockout(self):
+        # Usa IP finto via X-Forwarded-For così non blocca il runner reale
         s = requests.Session()
         s.verify = False
-        # 5 tentativi falliti
+        s.headers["X-Forwarded-For"] = "10.66.66.66"
         for _ in range(5):
             s.post(f"{BASE_URL}/index.php",
                    data={"username": TEST_USER, "password": "WRONG"})
-        # Al 6° deve essere bloccato
         r = s.post(f"{BASE_URL}/index.php",
                    data={"username": TEST_USER, "password": "WRONG"})
         assert "Troppi tentativi" in r.text
-        # Sblocca l'IP così i test successivi possono loggarsi
-        _unblock_my_ip()
 
 # ── 2. Autorizzazione ──────────────────────────────────────────────────────────
 

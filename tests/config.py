@@ -6,5 +6,3 @@ ADMIN_PASS = "la-tua-password-admin"   # <-- cambia
 
 TEST_USER  = "test"
 TEST_PASS  = "test10"
-
-UNBLOCK_SECRET = "unblock-secret-placeholder"   # <-- cambia
