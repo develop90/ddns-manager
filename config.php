@@ -13,7 +13,7 @@ define('DEFAULT_TTL', 300);
 
 // Versione applicazione
 define('APP_VERSION', '1.0');
-define('APP_BUILD', 14);
+define('APP_BUILD', 15);
 
 // Integrazione Plesk DNS API
 // Credenziali nel file .env (non versionato)

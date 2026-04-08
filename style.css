@@ -231,3 +231,15 @@ table td { color: #cbd5e1; }
 .stat-item .label { font-size: 0.8rem; color: #64748b; margin-top: 0.3rem; }
 
 .actions { display: flex; gap: 0.3rem; }
+
+/* Paginazione */
+.pagination { display:flex; gap:0.3rem; align-items:center; margin-top:1rem; flex-wrap:wrap; }
+.pagination a, .pagination span {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:2rem; height:2rem; padding:0 0.5rem;
+    border-radius:6px; font-size:0.8rem; font-weight:600; text-decoration:none;
+}
+.pagination a { background:#1e293b; color:#94a3b8; }
+.pagination a:hover { background:#334155; color:#e2e8f0; }
+.pagination span.current { background:#0ea5e9; color:#fff; }
+.pagination span.dots { color:#475569; }

@@ -128,6 +128,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unblo
     $msg = "IP $ip sbloccato."; $msgType = 'success';
 }
 
+// Svuota log accessi
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear_login_log') {
+    $db->exec("DELETE FROM login_log");
+    $msg = 'Log accessi svuotato.'; $msgType = 'success';
+}
+
 // Carica dati
 $domains = $db->query("SELECT d.*, COUNT(h.id) as host_count FROM domains d LEFT JOIN hosts h ON h.domain_id = d.id GROUP BY d.id ORDER BY d.zone")->fetchAll();
 $users = $db->query("SELECT u.*, COUNT(h.id) as host_count FROM users u LEFT JOIN hosts h ON h.user_id = u.id GROUP BY u.id ORDER BY u.username")->fetchAll();
@@ -140,13 +146,22 @@ $recentLogs = $db->query("
     LIMIT 20
 ")->fetchAll();
 $bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
-$loginLogs = $db->query("
+
+$logPerPage  = 25;
+$logPage     = max(1, (int)($_GET['log_page'] ?? 1));
+$logTotal    = (int)$db->query("SELECT COUNT(*) FROM login_log")->fetchColumn();
+$logPages    = max(1, (int)ceil($logTotal / $logPerPage));
+$logPage     = min($logPage, $logPages);
+$logOffset   = ($logPage - 1) * $logPerPage;
+$loginLogs   = $db->prepare("
     SELECT *,
         (SELECT COUNT(*) FROM login_log l2
          WHERE l2.ip = login_log.ip AND l2.success = 0
-         AND l2.logged_at >= datetime('now', '-10 minutes')) as recent_failures
-    FROM login_log ORDER BY logged_at DESC LIMIT 50
-")->fetchAll();
+         AND l2.logged_at >= datetime('now', '-' || ? || ' minutes')) as recent_failures
+    FROM login_log ORDER BY logged_at DESC LIMIT ? OFFSET ?
+");
+$loginLogs->execute([$bfSettings['bf_window_min'] ?? 10, $logPerPage, $logOffset]);
+$loginLogs = $loginLogs->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -315,13 +330,22 @@ $loginLogs = $db->query("
 
     <!-- Log login -->
     <div class="card">
-        <h2>Log accessi</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <h2 style="margin:0">Log accessi <?php if ($logTotal > 0): ?><span style="font-size:0.8rem;color:#64748b;font-weight:400">(<?= $logTotal ?> totali)</span><?php endif; ?></h2>
+            <?php if ($logTotal > 0): ?>
+            <form method="POST" onsubmit="return confirm('Svuotare tutto il log accessi?')">
+                <input type="hidden" name="action" value="clear_login_log">
+                <button class="btn btn-danger btn-sm">Svuota log</button>
+            </form>
+            <?php endif; ?>
+        </div>
+
         <?php if (empty($loginLogs)): ?>
             <p class="text-muted">Nessun accesso registrato.</p>
         <?php else: ?>
             <table>
                 <thead>
-                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Tentativi falliti</th><th>Data</th><th></th></tr>
+                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Falliti recenti</th><th>Data</th><th></th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($loginLogs as $ll): ?>
@@ -337,13 +361,13 @@ $loginLogs = $db->query("
                         </td>
                         <td>
                             <?php $f = (int)$ll['recent_failures']; ?>
-                            <span style="color:<?= $f >= 5 ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
-                                <?= $f ?><?= $f >= 5 ? ' 🔒 bloccato' : '' ?>
+                            <span style="color:<?= $f >= (int)($bfSettings['bf_max_attempts'] ?? 5) ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
+                                <?= $f ?><?= $f >= (int)($bfSettings['bf_max_attempts'] ?? 5) ? ' 🔒' : '' ?>
                             </span>
                         </td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
                         <td>
-                            <?php if ((int)$ll['recent_failures'] >= (int)($bfSettings['bf_max_attempts'] ?? 5)): ?>
+                            <?php if ($f >= (int)($bfSettings['bf_max_attempts'] ?? 5)): ?>
                             <form method="POST" style="display:inline">
                                 <input type="hidden" name="action" value="unblock_ip">
                                 <input type="hidden" name="ip" value="<?= htmlspecialchars($ll['ip']) ?>">
@@ -355,6 +379,33 @@ $loginLogs = $db->query("
                     <?php endforeach; ?>
                 </tbody>
             </table>
+
+            <?php if ($logPages > 1): ?>
+            <div class="pagination">
+                <?php if ($logPage > 1): ?>
+                    <a href="?log_page=1">«</a>
+                    <a href="?log_page=<?= $logPage - 1 ?>">‹</a>
+                <?php endif; ?>
+                <?php
+                $start = max(1, $logPage - 2);
+                $end   = min($logPages, $logPage + 2);
+                if ($start > 1) echo '<span class="dots">…</span>';
+                for ($p = $start; $p <= $end; $p++):
+                ?>
+                    <?php if ($p === $logPage): ?>
+                        <span class="current"><?= $p ?></span>
+                    <?php else: ?>
+                        <a href="?log_page=<?= $p ?>"><?= $p ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+                <?php if ($end < $logPages) echo '<span class="dots">…</span>'; ?>
+                <?php if ($logPage < $logPages): ?>
+                    <a href="?log_page=<?= $logPage + 1 ?>">›</a>
+                    <a href="?log_page=<?= $logPages ?>">»</a>
+                <?php endif; ?>
+                <span style="color:#475569;font-size:0.75rem;margin-left:0.5rem">pag. <?= $logPage ?>/<?= $logPages ?></span>
+            </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 
