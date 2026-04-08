@@ -158,20 +158,23 @@ $recentLogs = $db->query("
 ")->fetchAll();
 $bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
 
-$logPerPage  = 25;
-$logPage     = max(1, (int)($_GET['log_page'] ?? 1));
-$logTotal    = (int)$db->query("SELECT COUNT(*) FROM login_log")->fetchColumn();
-$logPages    = max(1, (int)ceil($logTotal / $logPerPage));
-$logPage     = min($logPage, $logPages);
-$logOffset   = ($logPage - 1) * $logPerPage;
-$loginLogs   = $db->prepare("
+$bfMax    = (int)($bfSettings['bf_max_attempts'] ?? 5);
+$bfWindow = (int)($bfSettings['bf_window_min']   ?? 10);
+
+$logPerPage = 25;
+$logPage    = max(1, (int)($_GET['log_page'] ?? 1));
+$logTotal   = (int)$db->query("SELECT COUNT(*) FROM login_log")->fetchColumn();
+$logPages   = max(1, (int)ceil($logTotal / $logPerPage));
+$logPage    = min($logPage, $logPages);
+$logOffset  = ($logPage - 1) * $logPerPage;
+$loginLogs  = $db->prepare("
     SELECT *,
         (SELECT COUNT(*) FROM login_log l2
          WHERE l2.ip = login_log.ip AND l2.success = 0
-         AND l2.logged_at >= datetime('now', '-' || ? || ' minutes')) as recent_failures
+         AND l2.logged_at >= datetime('now', '-{$bfWindow} minutes')) as recent_failures
     FROM login_log ORDER BY logged_at DESC LIMIT ? OFFSET ?
 ");
-$loginLogs->execute([$bfSettings['bf_window_min'] ?? 10, $logPerPage, $logOffset]);
+$loginLogs->execute([$logPerPage, $logOffset]);
 $loginLogs = $loginLogs->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -371,7 +374,12 @@ $loginLogs = $loginLogs->fetchAll();
                     <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Falliti recenti</th><th>Data</th><th></th></tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($loginLogs as $ll): ?>
+                    <?php $shownUnblock = []; foreach ($loginLogs as $ll):
+                        $f = (int)$ll['recent_failures'];
+                        $blocked = $f >= $bfMax;
+                        $showBtn = $blocked && !isset($shownUnblock[$ll['ip']]);
+                        if ($showBtn) $shownUnblock[$ll['ip']] = true;
+                    ?>
                     <tr>
                         <td><?= htmlspecialchars($ll['username']) ?></td>
                         <td class="text-muted"><?= htmlspecialchars($ll['ip']) ?></td>
@@ -383,14 +391,13 @@ $loginLogs = $loginLogs->fetchAll();
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php $f = (int)$ll['recent_failures']; ?>
-                            <span style="color:<?= $f >= (int)($bfSettings['bf_max_attempts'] ?? 5) ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
-                                <?= $f ?><?= $f >= (int)($bfSettings['bf_max_attempts'] ?? 5) ? ' 🔒' : '' ?>
+                            <span style="color:<?= $blocked ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
+                                <?= $f ?><?= $blocked ? ' 🔒' : '' ?>
                             </span>
                         </td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
                         <td>
-                            <?php if ($f >= (int)($bfSettings['bf_max_attempts'] ?? 5)): ?>
+                            <?php if ($showBtn): ?>
                             <form method="POST" style="display:inline">
                                 <input type="hidden" name="action" value="unblock_ip">
                                 <input type="hidden" name="ip" value="<?= htmlspecialchars($ll['ip']) ?>">
