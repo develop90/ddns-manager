@@ -67,7 +67,7 @@ if (!$user && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
     }
 }
 
-if (!$user) {
+if (!$user || !($user['active'] ?? 1)) {
     http_response_code(401);
     header('WWW-Authenticate: Basic realm="DDNS Update"');
     echo 'badauth';

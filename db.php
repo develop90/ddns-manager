@@ -64,6 +64,8 @@ function getDb(): PDO {
     ");
     // Migrazione: aggiunge source_type se non esiste (DB già esistente)
     try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
+    // Migrazione: aggiunge active agli utenti
+    try { $pdo->exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1"); } catch (PDOException $e) {}
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS settings (

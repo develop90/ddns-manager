@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
+        if ($user && password_verify($password, $user['password']) && ($user['active'] ?? 1)) {
             $db->prepare("INSERT INTO login_log (username, ip, success) VALUES (?, ?, 1)")
                ->execute([$username, $clientIp]);
             $_SESSION['user_id'] = $user['id'];

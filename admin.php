@@ -121,6 +121,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $msg = 'Impostazioni salvate.'; $msgType = 'success';
 }
 
+// Abilita/disabilita utente
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_user') {
+    $userId = (int)($_POST['user_id'] ?? 0);
+    if ($userId === $user['id']) {
+        $msg = 'Non puoi disabilitare te stesso.'; $msgType = 'danger';
+    } else {
+        $db->prepare("UPDATE users SET active = 1 - active WHERE id = ?")->execute([$userId]);
+        $msg = 'Utente aggiornato.'; $msgType = 'success';
+    }
+}
+
 // Sblocca IP
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unblock_ip') {
     $ip = $_POST['ip'] ?? '';
@@ -285,13 +296,25 @@ $loginLogs = $loginLogs->fetchAll();
                 <?php else: ?>
                 <tr>
                     <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
-                    <td><?= $u['is_admin'] ? 'Admin' : 'Utente' ?></td>
+                    <td>
+                        <?= $u['is_admin'] ? 'Admin' : 'Utente' ?>
+                        <?php if (!($u['active'] ?? 1)): ?>
+                            <span style="font-size:0.7rem;background:#7f1d1d;color:#fca5a5;padding:1px 6px;border-radius:4px;margin-left:4px">disabilitato</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= $u['host_count'] ?></td>
                     <td class="text-muted"><?= date('d/m/Y', strtotime($u['created_at'])) ?></td>
                     <td>
                         <div class="actions">
                             <a href="admin.php?edit_user=<?= $u['id'] ?>" class="btn btn-sm" style="background:#7c3aed">Modifica</a>
                             <?php if ($u['id'] !== $user['id']): ?>
+                            <form method="POST" style="display:inline">
+                                <input type="hidden" name="action" value="toggle_user">
+                                <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                                <button type="submit" class="btn btn-sm" style="background:<?= $u['active'] ?? 1 ? '#0369a1' : '#15803d' ?>">
+                                    <?= ($u['active'] ?? 1) ? 'Disabilita' : 'Abilita' ?>
+                                </button>
+                            </form>
                             <form method="POST" style="display:inline" onsubmit="return confirm('Eliminare questo utente e i suoi host?')">
                                 <input type="hidden" name="action" value="delete_user">
                                 <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
