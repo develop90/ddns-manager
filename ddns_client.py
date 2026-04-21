@@ -3,10 +3,17 @@
 DDNS Client — aggiorna automaticamente i record DNS ogni tot secondi.
 Usa il protocollo DynDNS2 (compatibile con router e No-IP).
 
+Configurazione tramite variabili d'ambiente o file .env:
+    DDNS_USERNAME=mio-utente
+    DDNS_PASSWORD=mia-password
+    DDNS_HOSTS=casa.ddns.gvweb.it,ufficio.ddns.gvweb.it
+    DDNS_SERVER=https://ddns.gvweb.it   (opzionale)
+    DDNS_INTERVAL=300                   (opzionale, secondi)
+
 Utilizzo:
-    python ddns_client.py                        # usa la configurazione qui sotto
-    python ddns_client.py --interval 120         # aggiorna ogni 120 secondi
-    python ddns_client.py --once                 # aggiorna una volta sola ed esci
+    python ddns_client.py               # aggiorna in loop
+    python ddns_client.py --interval 120
+    python ddns_client.py --once        # aggiorna una volta sola ed esci
 
 Requisiti:
     pip install requests
@@ -14,21 +21,32 @@ Requisiti:
 
 import argparse
 import logging
+import os
 import time
 import requests
 
 # ─────────────────────────────────────────────
-#  CONFIGURAZIONE — modifica questi valori
+#  CONFIGURAZIONE — tramite variabili d'ambiente
+#  oppure file .env nella stessa cartella
 # ─────────────────────────────────────────────
 
-SERVER   = "https://ddns.gvweb.it"       # URL del tuo server DDNS
-USERNAME = "il-tuo-username"             # username di accesso
-PASSWORD = "la-tua-password"            # password di accesso
-HOSTS    = [                             # lista degli hostname da aggiornare
-    "casa.ddns.gvweb.it",
-    # "ufficio.ddns.gvweb.it",           # aggiungi altri host se necessario
-]
-INTERVAL = 300                           # secondi tra un aggiornamento e l'altro (default: 5 min)
+def _load_env():
+    env_file = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.isfile(env_file):
+        with open(env_file) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    os.environ.setdefault(k.strip(), v.strip())
+
+_load_env()
+
+SERVER   = os.getenv("DDNS_SERVER",   "https://ddns.gvweb.it")
+USERNAME = os.getenv("DDNS_USERNAME", "")
+PASSWORD = os.getenv("DDNS_PASSWORD", "")
+HOSTS    = [h.strip() for h in os.getenv("DDNS_HOSTS", "").split(",") if h.strip()]
+INTERVAL = int(os.getenv("DDNS_INTERVAL", "300"))
 
 # ─────────────────────────────────────────────
 
@@ -114,6 +132,13 @@ if __name__ == "__main__":
     parser.add_argument("--once", action="store_true",
                         help="Aggiorna una volta sola ed esci")
     args = parser.parse_args()
+
+    if not USERNAME or not PASSWORD:
+        log.error("Credenziali mancanti. Imposta DDNS_USERNAME e DDNS_PASSWORD nel file .env")
+        raise SystemExit(1)
+    if not HOSTS:
+        log.error("Nessun host configurato. Imposta DDNS_HOSTS nel file .env (es: casa.ddns.gvweb.it)")
+        raise SystemExit(1)
 
     try:
         run(args.interval, args.once)
