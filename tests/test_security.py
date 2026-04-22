@@ -8,11 +8,13 @@ Requisiti:  pip install pytest requests
 
 import pytest
 import requests
+from urllib.parse import urlparse
 from config import BASE_URL, ADMIN_USER, ADMIN_PASS, TEST_USER, TEST_PASS
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-TEST_IP = "192.168.99.1"   # IP finto stabile per tutti i test (non blocca il runner reale)
+TEST_IP     = "192.168.99.1"                 # IP finto stabile (non blocca il runner reale)
+TEST_DOMAIN = urlparse(BASE_URL).netloc      # derivato da BASE_URL, es. ddns.gvweb.it
 
 def session_login(username, password):
     s = requests.Session()
@@ -110,28 +112,28 @@ class TestUpdateEndpoint:
 
     def test_no_auth_returns_badauth(self):
         r = requests.get(f"{BASE_URL}/nic/update",
-                         params={"hostname": "test.ddns.gvweb.it", "myip": "1.2.3.4"},
+                         params={"hostname": f"test.{TEST_DOMAIN}", "myip": "1.2.3.4"},
                          verify=False)
         assert r.status_code == 401
         assert "badauth" in r.text
 
     def test_wrong_credentials(self):
         r = requests.get(f"{BASE_URL}/nic/update",
-                         params={"hostname": "test.ddns.gvweb.it", "myip": "1.2.3.4"},
+                         params={"hostname": f"test.{TEST_DOMAIN}", "myip": "1.2.3.4"},
                          auth=("nobody", "wrong"),
                          verify=False)
         assert "badauth" in r.text
 
     def test_unknown_host_returns_nohost(self):
         r = requests.get(f"{BASE_URL}/nic/update",
-                         params={"hostname": "nonexistent-xyz-123.ddns.gvweb.it", "myip": "1.2.3.4"},
+                         params={"hostname": f"nonexistent-xyz-123.{TEST_DOMAIN}", "myip": "1.2.3.4"},
                          auth=(ADMIN_USER, ADMIN_PASS),
                          verify=False)
         assert "nohost" in r.text
 
     def test_invalid_ip_rejected(self):
         r = requests.get(f"{BASE_URL}/nic/update",
-                         params={"hostname": "test.ddns.gvweb.it", "myip": "not-an-ip"},
+                         params={"hostname": f"test.{TEST_DOMAIN}", "myip": "not-an-ip"},
                          auth=(TEST_USER, TEST_PASS),
                          verify=False)
         assert r.text.strip() in ("abuse", "nohost", "badauth")
@@ -141,7 +143,7 @@ class TestUpdateEndpoint:
         if not token:
             pytest.skip("Token non trovato")
         r = requests.get(f"{BASE_URL}/update.php",
-                         params={"token": token, "hostname": "nonexistent.ddns.gvweb.it", "myip": "1.2.3.4"},
+                         params={"token": token, "hostname": f"nonexistent.{TEST_DOMAIN}", "myip": "1.2.3.4"},
                          verify=False)
         assert r.text.strip() in ("nohost",)
 

@@ -10,7 +10,7 @@ define('DEFAULT_TTL', 300);
 
 // Versione applicazione
 define('APP_VERSION', '1.0');
-define('APP_BUILD', 19);
+define('APP_BUILD', 20);
 
 // Tutti i segreti vengono dal file .env (non versionato)
 $_env = is_file(__DIR__ . '/.env') ? parse_ini_file(__DIR__ . '/.env') : [];

@@ -5,3 +5,4 @@ data/
 *.sqlite-wal
 .env
 CLAUDE.md
+tests/config.py
