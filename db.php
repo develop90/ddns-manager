@@ -87,13 +87,18 @@ function getDb(): PDO {
         )
     ");
 
-    // Crea admin di default se non esiste
+    // Crea admin di default se non esiste (primo avvio)
     $stmt = $pdo->query("SELECT COUNT(*) as c FROM users");
     if ($stmt->fetch()['c'] == 0) {
-        $hash = password_hash('admin', PASSWORD_BCRYPT);
+        $defaultPass = bin2hex(random_bytes(8)); // 16 char hex, random ad ogni primo avvio
+        $hash  = password_hash($defaultPass, PASSWORD_BCRYPT);
         $token = bin2hex(random_bytes(32));
         $pdo->prepare("INSERT INTO users (username, password, is_admin, api_token) VALUES (?, ?, 1, ?)")
             ->execute(['admin', $hash, $token]);
+        // Scrivi la password in un file temporaneo leggibile solo dal server
+        $initFile = dirname($pdo->query("PRAGMA database_list")->fetch()['file']) . '/ADMIN_INIT_PASSWORD.txt';
+        file_put_contents($initFile, "Password admin iniziale: $defaultPass\nEliminare questo file dopo il primo login.\n");
+        error_log("[DDNS] Admin iniziale creato. Password: $defaultPass");
     }
 
     return $pdo;
