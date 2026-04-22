@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/plesk.php';
 requireLogin();
 
 $db = getDb();
@@ -40,8 +41,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_h
 // Elimina host
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_host') {
     $hostId = (int)($_POST['host_id'] ?? 0);
-    $stmt = $db->prepare("DELETE FROM hosts WHERE id = ? AND user_id = ?");
-    $stmt->execute([$hostId, $user['id']]);
+    $stmtDel = $db->prepare("SELECT h.hostname, d.zone FROM hosts h JOIN domains d ON h.domain_id = d.id WHERE h.id = ? AND h.user_id = ?");
+    $stmtDel->execute([$hostId, $user['id']]);
+    $toDelete = $stmtDel->fetch();
+    $db->prepare("DELETE FROM hosts WHERE id = ? AND user_id = ?")->execute([$hostId, $user['id']]);
+    if ($toDelete) pleskDnsDelete($toDelete['hostname'], $toDelete['zone']);
     $msg = 'Host eliminato.';
     $msgType = 'success';
 }
@@ -63,8 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'updat
         if ($host) {
             $db->prepare("UPDATE hosts SET ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ?")
                ->execute([$newIp, $hostId]);
-            $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
-               ->execute([$hostId, $host['ip_address'], $newIp, $clientIp]);
+            $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+               ->execute([$hostId, $host['ip_address'], $newIp, $clientIp, 'Dashboard']);
+            $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
+            $zoneStmt->execute([$host['domain_id']]);
+            pleskDnsUpdate($host['hostname'], $zoneStmt->fetchColumn(), $newIp);
             $msg = 'IP aggiornato a ' . $newIp;
             $msgType = 'success';
         }
@@ -88,10 +95,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'edit_
             $msg = 'Questo hostname esiste già su quel dominio.';
             $msgType = 'danger';
         } else {
-            $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ? WHERE id = ? AND user_id = ?")
-               ->execute([$newHostname, $newDomainId, $hostId, $user['id']]);
-            $msg = 'Host aggiornato.';
-            $msgType = 'success';
+            $customIp = trim($_POST['custom_ip_edit'] ?? '');
+            if ($customIp !== '' && !filter_var($customIp, FILTER_VALIDATE_IP)) {
+                $msg = 'Indirizzo IP non valido.';
+                $msgType = 'danger';
+            } else {
+                if ($customIp !== '') {
+                    $stmt2 = $db->prepare("SELECT ip_address FROM hosts WHERE id = ? AND user_id = ?");
+                    $stmt2->execute([$hostId, $user['id']]);
+                    $oldHost = $stmt2->fetch();
+                    $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+                    $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ?, ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
+                       ->execute([$newHostname, $newDomainId, $customIp, $hostId, $user['id']]);
+                    $db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+                       ->execute([$hostId, $oldHost['ip_address'] ?? '', $customIp, $clientIp, 'Modifica']);
+                    $zoneStmt = $db->prepare("SELECT zone FROM domains WHERE id = ?");
+                    $zoneStmt->execute([$newDomainId]);
+                    pleskDnsUpdate($newHostname, $zoneStmt->fetchColumn(), $customIp);
+                } else {
+                    $db->prepare("UPDATE hosts SET hostname = ?, domain_id = ? WHERE id = ? AND user_id = ?")
+                       ->execute([$newHostname, $newDomainId, $hostId, $user['id']]);
+                }
+                $msg = 'Host aggiornato.';
+                $msgType = 'success';
+            }
         }
     }
 }
@@ -150,11 +177,20 @@ $serverHost = $_SERVER['HTTP_HOST'] ?? 'tuoserver.com';
 <div class="navbar">
     <h1><?= APP_NAME ?></h1>
     <nav>
-        <a href="dashboard.php" class="active">Dashboard</a>
+        <a href="dashboard.php" class="active">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/><path d="M3 12v9h18v-9"/></svg></span>
+            <span class="nav-label">Dashboard</span>
+        </a>
         <?php if (isAdmin()): ?>
-            <a href="admin.php">Admin</a>
+        <a href="admin.php">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="nav-label">Admin</span>
+        </a>
         <?php endif; ?>
-        <a href="logout.php">Esci (<?= htmlspecialchars($user['username']) ?>)</a>
+        <a href="logout.php">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+            <span class="nav-label"><?= htmlspecialchars($user['username']) ?></span>
+        </a>
     </nav>
 </div>
 
@@ -306,16 +342,16 @@ $serverHost = $_SERVER['HTTP_HOST'] ?? 'tuoserver.com';
             <table>
                 <tr><td><strong>Servizio</strong></td><td>Custom / DynDNS</td></tr>
                 <tr><td><strong>Server</strong></td><td><?= htmlspecialchars($serverHost) ?></td></tr>
-                <tr><td><strong>URL di aggiornamento</strong></td><td>/ddns/nic/update?hostname=&lt;h&gt;&amp;myip=&lt;a&gt;</td></tr>
+                <tr><td><strong>URL di aggiornamento</strong></td><td>/nic/update?hostname=&lt;h&gt;&amp;myip=&lt;a&gt;</td></tr>
                 <tr><td><strong>Username</strong></td><td><?= htmlspecialchars($user['username']) ?></td></tr>
                 <tr><td><strong>Password</strong></td><td>La tua password di login</td></tr>
             </table>
 
             <p class="mt-2"><strong>Oppure aggiorna via URL diretta (con token):</strong></p>
-            <code>http://<?= htmlspecialchars($serverHost) ?>/ddns/update.php?token=<?= htmlspecialchars($user['api_token']) ?>&amp;hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
+            <code>http://<?= htmlspecialchars($serverHost) ?>/update.php?token=<?= htmlspecialchars($user['api_token']) ?>&amp;hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
 
             <p class="mt-2"><strong>Oppure via HTTP Basic Auth (compatibile con i router):</strong></p>
-            <code>http://<?= htmlspecialchars($user['username']) ?>:PASSWORD@<?= htmlspecialchars($serverHost) ?>/ddns/nic/update?hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
+            <code>http://<?= htmlspecialchars($user['username']) ?>:PASSWORD@<?= htmlspecialchars($serverHost) ?>/nic/update?hostname=miopc.esempio.it&amp;myip=1.2.3.4</code>
 
             <p class="text-muted mt-1">Se ometti <em>myip</em>, verrà usato l'IP da cui proviene la richiesta.</p>
         </div>
@@ -358,5 +394,8 @@ document.querySelectorAll('.form-update-ip').forEach(form => {
     });
 });
 </script>
+<footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
+    <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
+</footer>
 </body>
 </html>

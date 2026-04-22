@@ -4,7 +4,12 @@ RewriteEngine On
 # I router inviano richieste a /nic/update
 RewriteRule ^nic/update$ update.php [L,QSA]
 
-# Protezione directory dati
-<FilesMatch "\.sqlite$">
+# Blocca accesso diretto alla cartella data/ (SQLite, file init, ecc.)
+<IfModule mod_authz_core.c>
+    <DirectoryMatch "data/">
+        Require all denied
+    </DirectoryMatch>
+</IfModule>
+<FilesMatch "\.(sqlite|sqlite-wal|sqlite-shm|txt)$">
     Require all denied
 </FilesMatch>

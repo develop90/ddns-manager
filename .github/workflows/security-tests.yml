@@ -1,0 +1,26 @@
+name: Security Tests
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run security tests
+        env:
+          DDNS_ADMIN_PASS: ${{ secrets.DDNS_ADMIN_PASS }}
+          DDNS_TEST_PASS: ${{ secrets.DDNS_TEST_PASS }}
+        run: |
+          cd tests
+          pytest test_security.py -v --tb=short

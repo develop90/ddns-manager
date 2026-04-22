@@ -112,6 +112,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     }
 }
 
+// Salva impostazioni brute force
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_settings') {
+    foreach (['bf_max_attempts','bf_window_min','bf_lockout_min'] as $k) {
+        $v = max(1, (int)($_POST[$k] ?? 1));
+        $db->prepare("UPDATE settings SET value=? WHERE key=?")->execute([$v, $k]);
+    }
+    $msg = 'Impostazioni salvate.'; $msgType = 'success';
+}
+
+// Abilita/disabilita utente
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_user') {
+    $userId = (int)($_POST['user_id'] ?? 0);
+    if ($userId === $user['id']) {
+        $msg = 'Non puoi disabilitare te stesso.'; $msgType = 'danger';
+    } else {
+        $db->prepare("UPDATE users SET active = 1 - active WHERE id = ?")->execute([$userId]);
+        $msg = 'Utente aggiornato.'; $msgType = 'success';
+    }
+}
+
+// Sblocca IP
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unblock_ip') {
+    $ip = $_POST['ip'] ?? '';
+    $db->prepare("DELETE FROM login_log WHERE ip=? AND success=0")->execute([$ip]);
+    $msg = "IP $ip sbloccato."; $msgType = 'success';
+}
+
+// Svuota log accessi
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear_login_log') {
+    $db->exec("DELETE FROM login_log");
+    $msg = 'Log accessi svuotato.'; $msgType = 'success';
+}
+
 // Carica dati
 $domains = $db->query("SELECT d.*, COUNT(h.id) as host_count FROM domains d LEFT JOIN hosts h ON h.domain_id = d.id GROUP BY d.id ORDER BY d.zone")->fetchAll();
 $users = $db->query("SELECT u.*, COUNT(h.id) as host_count FROM users u LEFT JOIN hosts h ON h.user_id = u.id GROUP BY u.id ORDER BY u.username")->fetchAll();
@@ -123,6 +156,26 @@ $recentLogs = $db->query("
     ORDER BY l.updated_at DESC
     LIMIT 20
 ")->fetchAll();
+$bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+$bfMax    = (int)($bfSettings['bf_max_attempts'] ?? 5);
+$bfWindow = (int)($bfSettings['bf_window_min']   ?? 10);
+
+$logPerPage = 25;
+$logPage    = max(1, (int)($_GET['log_page'] ?? 1));
+$logTotal   = (int)$db->query("SELECT COUNT(*) FROM login_log")->fetchColumn();
+$logPages   = max(1, (int)ceil($logTotal / $logPerPage));
+$logPage    = min($logPage, $logPages);
+$logOffset  = ($logPage - 1) * $logPerPage;
+$loginLogs  = $db->prepare("
+    SELECT *,
+        (SELECT COUNT(*) FROM login_log l2
+         WHERE l2.ip = login_log.ip AND l2.success = 0
+         AND l2.logged_at >= datetime('now', '-{$bfWindow} minutes')) as recent_failures
+    FROM login_log ORDER BY logged_at DESC LIMIT ? OFFSET ?
+");
+$loginLogs->execute([$logPerPage, $logOffset]);
+$loginLogs = $loginLogs->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -136,9 +189,18 @@ $recentLogs = $db->query("
 <div class="navbar">
     <h1><?= APP_NAME ?></h1>
     <nav>
-        <a href="dashboard.php">Dashboard</a>
-        <a href="admin.php" class="active">Admin</a>
-        <a href="logout.php">Esci (<?= htmlspecialchars($user['username']) ?>)</a>
+        <a href="dashboard.php">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/><path d="M3 12v9h18v-9"/></svg></span>
+            <span class="nav-label">Dashboard</span>
+        </a>
+        <a href="admin.php" class="active">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="nav-label">Admin</span>
+        </a>
+        <a href="logout.php">
+            <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+            <span class="nav-label"><?= htmlspecialchars($user['username']) ?></span>
+        </a>
     </nav>
 </div>
 
@@ -237,13 +299,25 @@ $recentLogs = $db->query("
                 <?php else: ?>
                 <tr>
                     <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
-                    <td><?= $u['is_admin'] ? 'Admin' : 'Utente' ?></td>
+                    <td>
+                        <?= $u['is_admin'] ? 'Admin' : 'Utente' ?>
+                        <?php if (!($u['active'] ?? 1)): ?>
+                            <span style="font-size:0.7rem;background:#7f1d1d;color:#fca5a5;padding:1px 6px;border-radius:4px;margin-left:4px">disabilitato</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= $u['host_count'] ?></td>
                     <td class="text-muted"><?= date('d/m/Y', strtotime($u['created_at'])) ?></td>
                     <td>
                         <div class="actions">
                             <a href="admin.php?edit_user=<?= $u['id'] ?>" class="btn btn-sm" style="background:#7c3aed">Modifica</a>
                             <?php if ($u['id'] !== $user['id']): ?>
+                            <form method="POST" style="display:inline">
+                                <input type="hidden" name="action" value="toggle_user">
+                                <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
+                                <button type="submit" class="btn btn-sm" style="background:<?= $u['active'] ?? 1 ? '#0369a1' : '#15803d' ?>">
+                                    <?= ($u['active'] ?? 1) ? 'Disabilita' : 'Abilita' ?>
+                                </button>
+                            </form>
                             <form method="POST" style="display:inline" onsubmit="return confirm('Eliminare questo utente e i suoi host?')">
                                 <input type="hidden" name="action" value="delete_user">
                                 <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
@@ -259,6 +333,112 @@ $recentLogs = $db->query("
         </table>
     </div>
 
+    <!-- Impostazioni Brute Force -->
+    <div class="card">
+        <h2>Protezione Brute Force</h2>
+        <form method="POST" class="form-inline">
+            <input type="hidden" name="action" value="save_settings">
+            <div class="form-group">
+                <label>Max tentativi falliti</label>
+                <input type="number" name="bf_max_attempts" value="<?= (int)($bfSettings['bf_max_attempts'] ?? 5) ?>" min="1" style="width:80px">
+            </div>
+            <div class="form-group">
+                <label>Finestra (minuti)</label>
+                <input type="number" name="bf_window_min" value="<?= (int)($bfSettings['bf_window_min'] ?? 10) ?>" min="1" style="width:80px">
+            </div>
+            <div class="form-group">
+                <label>Blocco (minuti)</label>
+                <input type="number" name="bf_lockout_min" value="<?= (int)($bfSettings['bf_lockout_min'] ?? 15) ?>" min="1" style="width:80px">
+            </div>
+            <button type="submit" class="btn btn-primary" style="align-self:end">Salva</button>
+        </form>
+    </div>
+
+    <!-- Log login -->
+    <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <h2 style="margin:0">Log accessi <?php if ($logTotal > 0): ?><span style="font-size:0.8rem;color:#64748b;font-weight:400">(<?= $logTotal ?> totali)</span><?php endif; ?></h2>
+            <?php if ($logTotal > 0): ?>
+            <form method="POST" onsubmit="return confirm('Svuotare tutto il log accessi?')">
+                <input type="hidden" name="action" value="clear_login_log">
+                <button class="btn btn-danger btn-sm">Svuota log</button>
+            </form>
+            <?php endif; ?>
+        </div>
+
+        <?php if (empty($loginLogs)): ?>
+            <p class="text-muted">Nessun accesso registrato.</p>
+        <?php else: ?>
+            <table>
+                <thead>
+                    <tr><th>Utente</th><th>IP</th><th>Esito</th><th>Falliti recenti</th><th>Data</th><th></th></tr>
+                </thead>
+                <tbody>
+                    <?php $shownUnblock = []; foreach ($loginLogs as $ll):
+                        $f = (int)$ll['recent_failures'];
+                        $blocked = $f >= $bfMax;
+                        $showBtn = $blocked && !isset($shownUnblock[$ll['ip']]);
+                        if ($showBtn) $shownUnblock[$ll['ip']] = true;
+                    ?>
+                    <tr>
+                        <td><?= htmlspecialchars($ll['username']) ?></td>
+                        <td class="text-muted"><?= htmlspecialchars($ll['ip']) ?></td>
+                        <td>
+                            <?php if ($ll['success']): ?>
+                                <span style="color:#86efac">✓ Successo</span>
+                            <?php else: ?>
+                                <span style="color:#fca5a5">✗ Fallito</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <span style="color:<?= $blocked ? '#f87171' : ($f >= 3 ? '#fb923c' : '#64748b') ?>">
+                                <?= $f ?><?= $blocked ? ' 🔒' : '' ?>
+                            </span>
+                        </td>
+                        <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($ll['logged_at'])) ?></td>
+                        <td>
+                            <?php if ($showBtn): ?>
+                            <form method="POST" style="display:inline">
+                                <input type="hidden" name="action" value="unblock_ip">
+                                <input type="hidden" name="ip" value="<?= htmlspecialchars($ll['ip']) ?>">
+                                <button class="btn btn-sm btn-success">Sblocca</button>
+                            </form>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <?php if ($logPages > 1): ?>
+            <div class="pagination">
+                <?php if ($logPage > 1): ?>
+                    <a href="?log_page=1">«</a>
+                    <a href="?log_page=<?= $logPage - 1 ?>">‹</a>
+                <?php endif; ?>
+                <?php
+                $start = max(1, $logPage - 2);
+                $end   = min($logPages, $logPage + 2);
+                if ($start > 1) echo '<span class="dots">…</span>';
+                for ($p = $start; $p <= $end; $p++):
+                ?>
+                    <?php if ($p === $logPage): ?>
+                        <span class="current"><?= $p ?></span>
+                    <?php else: ?>
+                        <a href="?log_page=<?= $p ?>"><?= $p ?></a>
+                    <?php endif; ?>
+                <?php endfor; ?>
+                <?php if ($end < $logPages) echo '<span class="dots">…</span>'; ?>
+                <?php if ($logPage < $logPages): ?>
+                    <a href="?log_page=<?= $logPage + 1 ?>">›</a>
+                    <a href="?log_page=<?= $logPages ?>">»</a>
+                <?php endif; ?>
+                <span style="color:#475569;font-size:0.75rem;margin-left:0.5rem">pag. <?= $logPage ?>/<?= $logPages ?></span>
+            </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+
     <!-- Log aggiornamenti -->
     <div class="card">
         <h2>Ultimi aggiornamenti DNS</h2>
@@ -267,7 +447,7 @@ $recentLogs = $db->query("
         <?php else: ?>
             <table>
                 <thead>
-                    <tr><th>Host</th><th>IP precedente</th><th>Nuovo IP</th><th>Sorgente</th><th>Data</th></tr>
+                    <tr><th>Host</th><th>IP precedente</th><th>Nuovo IP</th><th>Tipo</th><th>Sorgente</th><th>Data</th></tr>
                 </thead>
                 <tbody>
                     <?php foreach ($recentLogs as $log): ?>
@@ -275,6 +455,7 @@ $recentLogs = $db->query("
                         <td><?= htmlspecialchars($log['hostname'] . '.' . $log['zone']) ?></td>
                         <td><span class="ip-badge"><?= htmlspecialchars($log['old_ip'] ?: '-') ?></span></td>
                         <td><span class="ip-badge"><?= htmlspecialchars($log['new_ip']) ?></span></td>
+                        <td><?= htmlspecialchars($log['source_type'] ?: '-') ?></td>
                         <td class="text-muted"><?= htmlspecialchars($log['source_ip']) ?></td>
                         <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($log['updated_at'])) ?></td>
                     </tr>
@@ -284,5 +465,8 @@ $recentLogs = $db->query("
         <?php endif; ?>
     </div>
 </div>
+<footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
+    <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
+</footer>
 </body>
 </html>

@@ -57,18 +57,48 @@ function getDb(): PDO {
             old_ip TEXT,
             new_ip TEXT,
             source_ip TEXT,
+            source_type TEXT DEFAULT '',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )
     ");
+    // Migrazione: aggiunge source_type se non esiste (DB già esistente)
+    try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
+    // Migrazione: aggiunge active agli utenti
+    try { $pdo->exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1"); } catch (PDOException $e) {}
 
-    // Crea admin di default se non esiste
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ");
+    foreach (['bf_max_attempts'=>'5','bf_window_min'=>'10','bf_lockout_min'=>'15','bf_whitelist'=>''] as $k=>$v) {
+        $pdo->prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)")->execute([$k, $v]);
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS login_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            ip TEXT,
+            success INTEGER DEFAULT 0,
+            logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    // Crea admin di default se non esiste (primo avvio)
     $stmt = $pdo->query("SELECT COUNT(*) as c FROM users");
     if ($stmt->fetch()['c'] == 0) {
-        $hash = password_hash('admin', PASSWORD_BCRYPT);
+        $defaultPass = bin2hex(random_bytes(8)); // 16 char hex, random ad ogni primo avvio
+        $hash  = password_hash($defaultPass, PASSWORD_BCRYPT);
         $token = bin2hex(random_bytes(32));
         $pdo->prepare("INSERT INTO users (username, password, is_admin, api_token) VALUES (?, ?, 1, ?)")
             ->execute(['admin', $hash, $token]);
+        // Scrivi la password in un file temporaneo leggibile solo dal server
+        $initFile = dirname($pdo->query("PRAGMA database_list")->fetch()['file']) . '/ADMIN_INIT_PASSWORD.txt';
+        file_put_contents($initFile, "Password admin iniziale: $defaultPass\nEliminare questo file dopo il primo login.\n");
+        error_log("[DDNS] Admin iniziale creato. Password: $defaultPass");
     }
 
     return $pdo;
