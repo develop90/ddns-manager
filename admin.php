@@ -161,11 +161,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'uploa
     }
 }
 
-// Elimina logo
+// Salva URL logo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_logo_url') {
+    $url = trim($_POST['logo_url'] ?? '');
+    if ($url && !filter_var($url, FILTER_VALIDATE_URL)) {
+        $msg = 'URL non valido.'; $msgType = 'danger';
+    } else {
+        if ($url) {
+            $db->prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('logo_url',?)")->execute([$url]);
+        } else {
+            $db->prepare("DELETE FROM settings WHERE key='logo_url'")->execute();
+        }
+        $msg = $url ? 'URL logo salvato.' : 'URL logo rimosso.'; $msgType = 'success';
+    }
+}
+
+// Elimina logo (file + URL)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_logo') {
     $ext = $db->query("SELECT value FROM settings WHERE key='logo_ext'")->fetchColumn();
     if ($ext) @unlink(__DIR__ . '/data/logo.' . $ext);
-    $db->prepare("DELETE FROM settings WHERE key='logo_ext'")->execute();
+    $db->prepare("DELETE FROM settings WHERE key IN ('logo_ext','logo_url')")->execute();
     $msg = 'Logo rimosso.'; $msgType = 'success';
 }
 
@@ -373,28 +388,44 @@ $loginLogs = $loginLogs->fetchAll();
     <!-- Logo -->
     <div class="card">
         <h2>Logo sito</h2>
-        <?php $logoUrl = getLogoUrl(); ?>
+        <?php
+            $logoUrl    = getLogoUrl();
+            $logoUrlSaved = $db->query("SELECT value FROM settings WHERE key='logo_url'")->fetchColumn() ?: '';
+        ?>
         <?php if ($logoUrl): ?>
         <div style="margin-bottom:1rem">
-            <img src="<?= $logoUrl ?>" style="max-height:80px;max-width:300px;object-fit:contain;background:#0f172a;padding:8px;border-radius:8px;border:1px solid #334155">
+            <img src="<?= htmlspecialchars($logoUrl) ?>" style="max-height:80px;max-width:300px;object-fit:contain;background:#0f172a;padding:8px;border-radius:8px;border:1px solid #334155">
         </div>
         <?php endif; ?>
-        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:flex-start">
+            <!-- Upload file -->
             <form method="POST" enctype="multipart/form-data" class="form-inline" style="flex:1;min-width:220px">
                 <input type="hidden" name="action" value="upload_logo">
                 <div class="form-group" style="flex:1">
-                    <label>Carica immagine (JPG, PNG, WEBP, SVG — max 2 MB)</label>
+                    <label>Carica file (JPG, PNG, WEBP, SVG — max 2 MB)</label>
                     <input type="file" name="logo" accept="image/*" required style="padding:0.35rem">
                 </div>
                 <button type="submit" class="btn btn-primary" style="align-self:end">Carica</button>
             </form>
-            <?php if ($logoUrl): ?>
-            <form method="POST" onsubmit="return confirm('Rimuovere il logo?')">
-                <input type="hidden" name="action" value="delete_logo">
-                <button type="submit" class="btn btn-danger">Rimuovi logo</button>
+
+            <!-- URL esterno -->
+            <form method="POST" class="form-inline" style="flex:1;min-width:220px">
+                <input type="hidden" name="action" value="save_logo_url">
+                <div class="form-group" style="flex:1">
+                    <label>Oppure inserisci URL immagine</label>
+                    <input type="url" name="logo_url" placeholder="https://..." value="<?= htmlspecialchars($logoUrlSaved) ?>">
+                </div>
+                <button type="submit" class="btn btn-primary" style="align-self:end">Salva URL</button>
             </form>
-            <?php endif; ?>
         </div>
+
+        <?php if ($logoUrl): ?>
+        <form method="POST" style="margin-top:0.75rem" onsubmit="return confirm('Rimuovere il logo?')">
+            <input type="hidden" name="action" value="delete_logo">
+            <button type="submit" class="btn btn-danger btn-sm">Rimuovi logo</button>
+        </form>
+        <?php endif; ?>
     </div>
 
     <!-- Impostazioni Brute Force -->
