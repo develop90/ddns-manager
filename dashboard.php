@@ -175,7 +175,14 @@ $serverHost = $_SERVER['HTTP_HOST'] ?? 'tuoserver.com';
 </head>
 <body>
 <div class="navbar">
-    <h1><?= APP_NAME ?></h1>
+    <?php $logoUrl = getLogoUrl(); ?>
+    <a href="dashboard.php" style="text-decoration:none;color:inherit;display:flex;align-items:center">
+        <?php if ($logoUrl): ?>
+            <img src="<?= $logoUrl ?>" style="max-height:44px;max-width:160px;object-fit:contain">
+        <?php else: ?>
+            <h1><?= APP_NAME ?></h1>
+        <?php endif; ?>
+    </a>
     <nav>
         <a href="dashboard.php" class="active">
             <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/><path d="M3 12v9h18v-9"/></svg></span>

@@ -104,6 +104,11 @@ function getDb(): PDO {
     return $pdo;
 }
 
+function getLogoUrl(): ?string {
+    $ext = getDb()->query("SELECT value FROM settings WHERE key='logo_ext'")->fetchColumn();
+    return $ext ? BASE_URL . '/logo.php?v=' . filemtime(__DIR__ . '/data/logo.' . $ext) : null;
+}
+
 function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
 }

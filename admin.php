@@ -139,6 +139,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'unblo
     $msg = "IP $ip sbloccato."; $msgType = 'success';
 }
 
+// Upload logo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'upload_logo') {
+    $file = $_FILES['logo'] ?? null;
+    $allowed = ['image/jpeg'=>'jpg','image/png'=>'png','image/gif'=>'gif','image/webp'=>'webp','image/svg+xml'=>'svg'];
+    if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
+        $msg = 'Errore nel caricamento del file.'; $msgType = 'danger';
+    } elseif (!isset($allowed[$file['type']])) {
+        $msg = 'Formato non supportato (usa JPG, PNG, GIF, WEBP, SVG).'; $msgType = 'danger';
+    } elseif ($file['size'] > 2 * 1024 * 1024) {
+        $msg = 'File troppo grande (max 2 MB).'; $msgType = 'danger';
+    } else {
+        $ext = $allowed[$file['type']];
+        // Rimuovi logo precedente
+        foreach (['jpg','jpeg','png','gif','webp','svg'] as $e) {
+            @unlink(__DIR__ . '/data/logo.' . $e);
+        }
+        move_uploaded_file($file['tmp_name'], __DIR__ . '/data/logo.' . $ext);
+        $db->prepare("INSERT OR REPLACE INTO settings (key,value) VALUES ('logo_ext',?)")->execute([$ext]);
+        $msg = 'Logo caricato.'; $msgType = 'success';
+    }
+}
+
+// Elimina logo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_logo') {
+    $ext = $db->query("SELECT value FROM settings WHERE key='logo_ext'")->fetchColumn();
+    if ($ext) @unlink(__DIR__ . '/data/logo.' . $ext);
+    $db->prepare("DELETE FROM settings WHERE key='logo_ext'")->execute();
+    $msg = 'Logo rimosso.'; $msgType = 'success';
+}
+
 // Svuota log accessi
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'clear_login_log') {
     $db->exec("DELETE FROM login_log");
@@ -187,7 +217,14 @@ $loginLogs = $loginLogs->fetchAll();
 </head>
 <body>
 <div class="navbar">
-    <h1><?= APP_NAME ?></h1>
+    <?php $logoUrl = getLogoUrl(); ?>
+    <a href="dashboard.php" style="text-decoration:none;color:inherit;display:flex;align-items:center">
+        <?php if ($logoUrl): ?>
+            <img src="<?= $logoUrl ?>" style="max-height:44px;max-width:160px;object-fit:contain">
+        <?php else: ?>
+            <h1><?= APP_NAME ?></h1>
+        <?php endif; ?>
+    </a>
     <nav>
         <a href="dashboard.php">
             <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12L12 3l9 9"/><path d="M9 21V12h6v9"/><path d="M3 12v9h18v-9"/></svg></span>
@@ -331,6 +368,33 @@ $loginLogs = $loginLogs->fetchAll();
                 <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+
+    <!-- Logo -->
+    <div class="card">
+        <h2>Logo sito</h2>
+        <?php $logoUrl = getLogoUrl(); ?>
+        <?php if ($logoUrl): ?>
+        <div style="margin-bottom:1rem">
+            <img src="<?= $logoUrl ?>" style="max-height:80px;max-width:300px;object-fit:contain;background:#0f172a;padding:8px;border-radius:8px;border:1px solid #334155">
+        </div>
+        <?php endif; ?>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end">
+            <form method="POST" enctype="multipart/form-data" class="form-inline" style="flex:1;min-width:220px">
+                <input type="hidden" name="action" value="upload_logo">
+                <div class="form-group" style="flex:1">
+                    <label>Carica immagine (JPG, PNG, WEBP, SVG — max 2 MB)</label>
+                    <input type="file" name="logo" accept="image/*" required style="padding:0.35rem">
+                </div>
+                <button type="submit" class="btn btn-primary" style="align-self:end">Carica</button>
+            </form>
+            <?php if ($logoUrl): ?>
+            <form method="POST" onsubmit="return confirm('Rimuovere il logo?')">
+                <input type="hidden" name="action" value="delete_logo">
+                <button type="submit" class="btn btn-danger">Rimuovi logo</button>
+            </form>
+            <?php endif; ?>
+        </div>
     </div>
 
     <!-- Impostazioni Brute Force -->

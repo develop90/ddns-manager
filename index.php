@@ -62,9 +62,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="login-wrap">
+<?php $logoUrl = getLogoUrl(); ?>
+<div class="login-wrap"<?= $logoUrl ? ' style="background-image:url(' . $logoUrl . ');background-size:cover;background-position:center"' : '' ?>>
     <div class="login-box">
-        <h1><?= APP_NAME ?></h1>
+        <?php if ($logoUrl): ?>
+            <a href="index.php"><img src="<?= $logoUrl ?>" style="max-height:80px;max-width:220px;object-fit:contain;margin-bottom:0.5rem"></a>
+        <?php else: ?>
+            <h1><?= APP_NAME ?></h1>
+        <?php endif; ?>
         <p class="subtitle">Dynamic DNS Management</p>
 
         <?php if ($error): ?>
