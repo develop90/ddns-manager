@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - <?= APP_NAME ?></title>
     <link rel="stylesheet" href="style.css">
+<script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light-pre');</script>
 </head>
 <body>
 <?php $logoUrl = getLogoUrl(); ?>
@@ -93,5 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
     <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
 </footer>
+<script>
+(function(){
+    if(localStorage.getItem('theme')==='light') document.body.classList.add('light');
+})();
+</script>
 </body>
 </html>

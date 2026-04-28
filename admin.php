@@ -253,6 +253,7 @@ $loginLogs = $loginLogs->fetchAll();
             <span class="nav-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
             <span class="nav-label"><?= htmlspecialchars($user['username']) ?></span>
         </a>
+        <button class="theme-toggle" id="themeToggle" title="Cambia tema">🌙</button>
     </nav>
 </div>
 
@@ -587,6 +588,7 @@ $loginLogs = $loginLogs->fetchAll();
 <footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
     <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
 </footer>
+<script src="theme.js"></script>
 <script>
 (function(){
     var tabs   = document.querySelectorAll('.tab-btn');
