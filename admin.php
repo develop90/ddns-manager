@@ -261,6 +261,16 @@ $loginLogs = $loginLogs->fetchAll();
         <div class="alert alert-<?= $msgType ?>"><?= htmlspecialchars($msg) ?></div>
     <?php endif; ?>
 
+    <!-- Tab nav -->
+    <div class="tabs">
+        <button class="tab-btn" data-tab="domini">Domini</button>
+        <button class="tab-btn" data-tab="utenti">Utenti</button>
+        <button class="tab-btn" data-tab="impostazioni">Impostazioni</button>
+        <button class="tab-btn" data-tab="log">Log</button>
+    </div>
+
+    <!-- TAB: Domini -->
+    <div class="tab-panel" id="tab-domini">
     <!-- Gestione Domini -->
     <div class="card">
         <h2>Gestione Domini</h2>
@@ -300,6 +310,10 @@ $loginLogs = $loginLogs->fetchAll();
         <?php endif; ?>
     </div>
 
+    </div><!-- /tab-domini -->
+
+    <!-- TAB: Utenti -->
+    <div class="tab-panel" id="tab-utenti">
     <!-- Gestione Utenti -->
     <div class="card">
         <h2>Gestione Utenti</h2>
@@ -385,6 +399,10 @@ $loginLogs = $loginLogs->fetchAll();
         </table>
     </div>
 
+    </div><!-- /tab-utenti -->
+
+    <!-- TAB: Impostazioni -->
+    <div class="tab-panel" id="tab-impostazioni">
     <!-- Logo -->
     <div class="card">
         <h2>Logo sito</h2>
@@ -449,6 +467,10 @@ $loginLogs = $loginLogs->fetchAll();
         </form>
     </div>
 
+    </div><!-- /tab-impostazioni -->
+
+    <!-- TAB: Log -->
+    <div class="tab-panel" id="tab-log">
     <!-- Log login -->
     <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
@@ -559,9 +581,46 @@ $loginLogs = $loginLogs->fetchAll();
             </table>
         <?php endif; ?>
     </div>
-</div>
+    </div><!-- /tab-log -->
+
+</div><!-- /container -->
 <footer style="text-align:center;padding:1rem 0 1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid #1e293b;margin-top:2rem">
     <?= APP_NAME ?> v<?= APP_VERSION ?> — build <?= APP_BUILD ?>
 </footer>
+<script>
+(function(){
+    var tabs   = document.querySelectorAll('.tab-btn');
+    var panels = document.querySelectorAll('.tab-panel');
+    var saved  = location.hash.replace('#','') || localStorage.getItem('adminTab') || 'domini';
+
+    function activate(name) {
+        tabs.forEach(function(b){ b.classList.toggle('active', b.dataset.tab === name); });
+        panels.forEach(function(p){ p.classList.toggle('active', p.id === 'tab-' + name); });
+        localStorage.setItem('adminTab', name);
+        history.replaceState(null,'','#' + name);
+    }
+
+    tabs.forEach(function(b){
+        b.addEventListener('click', function(){ activate(b.dataset.tab); });
+    });
+
+    // Attiva il tab corretto (da hash, localStorage o default)
+    var valid = Array.from(tabs).map(function(b){ return b.dataset.tab; });
+    activate(valid.includes(saved) ? saved : 'domini');
+
+    // Se c'è un messaggio di feedback, mostra il tab giusto in base all'azione POST
+    <?php if ($msg && $_SERVER['REQUEST_METHOD'] === 'POST'): ?>
+    var action = <?= json_encode($_POST['action'] ?? '') ?>;
+    var map = {
+        add_domain:'domini', delete_domain:'domini',
+        add_user:'utenti', edit_user:'utenti', delete_user:'utenti', toggle_user:'utenti',
+        upload_logo:'impostazioni', save_logo_url:'impostazioni', delete_logo:'impostazioni',
+        save_settings:'impostazioni',
+        unblock_ip:'log', clear_login_log:'log'
+    };
+    if (map[action]) activate(map[action]);
+    <?php endif; ?>
+})();
+</script>
 </body>
 </html>

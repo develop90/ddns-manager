@@ -243,3 +243,16 @@ table td { color: #cbd5e1; }
 .pagination a:hover { background:#334155; color:#e2e8f0; }
 .pagination span.current { background:#0ea5e9; color:#fff; }
 .pagination span.dots { color:#475569; }
+
+/* Tab admin */
+.tabs { display:flex; gap:0.25rem; border-bottom:2px solid #1e293b; margin-bottom:1.5rem; flex-wrap:wrap; }
+.tab-btn {
+    padding:0.55rem 1.1rem; font-size:0.875rem; font-weight:600;
+    background:none; border:none; border-bottom:2px solid transparent;
+    color:#64748b; cursor:pointer; margin-bottom:-2px; border-radius:6px 6px 0 0;
+    transition:color .15s, border-color .15s, background .15s;
+}
+.tab-btn:hover { color:#e2e8f0; background:#1e293b; }
+.tab-btn.active { color:#38bdf8; border-bottom-color:#38bdf8; background:#1e293b; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
