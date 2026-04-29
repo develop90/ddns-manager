@@ -25,24 +25,47 @@ function _pleskConfig(): array {
 
 function _pleskXml(string $xml): string {
     $cfg = _pleskConfig();
-    $ch = curl_init(rtrim($cfg['host'], '/') . '/enterprise/control/agent.php');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $xml,
-        CURLOPT_USERPWD        => $cfg['user'] . ':' . $cfg['password'],
-        CURLOPT_HTTPHEADER     => [
-            'Content-Type: text/xml',
-            'HTTP_AUTH_LOGIN: '  . $cfg['user'],
-            'HTTP_AUTH_PASSWD: ' . $cfg['password'],
-        ],
-        CURLOPT_SSL_VERIFYPEER => $cfg['verify_ssl'],
-        CURLOPT_SSL_VERIFYHOST => $cfg['verify_ssl'] ? 2 : 0,
-        CURLOPT_TIMEOUT        => 10,
-    ]);
-    $resp = curl_exec($ch);
-    curl_close($ch);
-    return $resp ?: '';
+    $url = rtrim($cfg['host'], '/') . '/enterprise/control/agent.php';
+
+    $request = function (bool $verifySsl) use ($url, $xml, $cfg): array {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $xml,
+            CURLOPT_USERPWD        => $cfg['user'] . ':' . $cfg['password'],
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: text/xml',
+                'HTTP_AUTH_LOGIN: '  . $cfg['user'],
+                'HTTP_AUTH_PASSWD: ' . $cfg['password'],
+            ],
+            CURLOPT_SSL_VERIFYPEER => $verifySsl,
+            CURLOPT_SSL_VERIFYHOST => $verifySsl ? 2 : 0,
+            CURLOPT_TIMEOUT        => 10,
+        ]);
+        $resp = curl_exec($ch);
+        $meta = [
+            'url' => $url,
+            'http_code' => curl_getinfo($ch, CURLINFO_HTTP_CODE),
+            'content_type' => curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '',
+            'curl_errno' => curl_errno($ch),
+            'curl_error' => curl_error($ch),
+            'length' => is_string($resp) ? strlen($resp) : 0,
+            'verify_ssl' => $verifySsl,
+            'ssl_retry' => false,
+        ];
+        curl_close($ch);
+        return [$resp, $meta];
+    };
+
+    [$resp, $meta] = $request($cfg['verify_ssl']);
+    if ($cfg['verify_ssl'] && (int)$meta['curl_errno'] === 60) {
+        [$resp, $meta] = $request(false);
+        $meta['ssl_retry'] = true;
+    }
+
+    $GLOBALS['_plesk_last_transport'] = $meta;
+    return is_string($resp) ? $resp : '';
 }
 
 function _pleskLog(string $action, string $hostname, string $zone, string $ip, bool $success, string $message): void {
@@ -57,9 +80,25 @@ function _pleskLog(string $action, string $hostname, string $zone, string $ip, b
 }
 
 function _pleskResultMessage(string $resp): string {
-    if ($resp === '') return 'Risposta vuota da Plesk.';
+    $meta = $GLOBALS['_plesk_last_transport'] ?? [];
+    $httpCode = (int)($meta['http_code'] ?? 0);
+    $errno = (int)($meta['curl_errno'] ?? 0);
+    $curlError = trim((string)($meta['curl_error'] ?? ''));
+    $contentType = trim((string)($meta['content_type'] ?? ''));
+    $sslRetry = !empty($meta['ssl_retry']) ? ' Retry senza verifica SSL eseguito.' : '';
+
+    if ($resp === '') {
+        if ($errno !== 0) {
+            return 'Errore cURL ' . $errno . ': ' . ($curlError ?: 'errore sconosciuto') . '.' . $sslRetry;
+        }
+        return 'Risposta vuota da Plesk' . ($httpCode ? ' (HTTP ' . $httpCode . ')' : '') . '.' . $sslRetry;
+    }
     $xml = @simplexml_load_string($resp);
-    if (!$xml) return 'Risposta XML non valida da Plesk.';
+    if (!$xml) {
+        return 'Risposta XML non valida da Plesk' .
+            ($httpCode ? ' (HTTP ' . $httpCode . ')' : '') .
+            ($contentType ? ', content-type ' . $contentType : '') . '.' . $sslRetry;
+    }
 
     $result = $xml->xpath('//result')[0] ?? null;
     if (!$result) return 'Risposta Plesk senza nodo result.';
@@ -69,10 +108,10 @@ function _pleskResultMessage(string $resp): string {
     $id = trim((string)($result->id ?? ''));
 
     if ($status === 'ok') {
-        return $id !== '' ? "OK, record id $id." : 'OK.';
+        return ($id !== '' ? "OK, record id $id." : 'OK.') . $sslRetry;
     }
 
-    return $errText !== '' ? $errText : 'Operazione Plesk non riuscita.';
+    return ($errText !== '' ? $errText : 'Operazione Plesk non riuscita.') . $sslRetry;
 }
 
 function _pleskResponseOk(string $resp): bool {
