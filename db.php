@@ -125,6 +125,18 @@ function getLogoUrl(): ?string {
     return $ext ? BASE_URL . '/logo.php?v=' . @filemtime(__DIR__ . '/data/logo.' . $ext) : null;
 }
 
+function getSettingValue(string $key, ?string $default = null): ?string {
+    $stmt = getDb()->prepare("SELECT value FROM settings WHERE key = ?");
+    $stmt->execute([$key]);
+    $value = $stmt->fetchColumn();
+    return $value === false ? $default : (string)$value;
+}
+
+function setSettingValue(string $key, string $value): void {
+    getDb()->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+        ->execute([$key, $value]);
+}
+
 function isLoggedIn(): bool {
     return isset($_SESSION['user_id']);
 }

@@ -1,19 +1,43 @@
 <?php
 
+function _pleskSetting(string $key, string $default = ''): string {
+    try {
+        $value = getSettingValue($key, null);
+    } catch (Throwable $e) {
+        $value = null;
+    }
+    return ($value !== null && $value !== '') ? $value : $default;
+}
+
+function _pleskConfig(): array {
+    return [
+        'host' => _pleskSetting('plesk_host', defined('PLESK_HOST') ? PLESK_HOST : ''),
+        'user' => _pleskSetting('plesk_user', defined('PLESK_USER') ? PLESK_USER : ''),
+        'password' => _pleskSetting('plesk_password', defined('PLESK_PASSWORD') ? PLESK_PASSWORD : ''),
+        'domain' => _pleskSetting('plesk_domain', defined('PLESK_DOMAIN') ? PLESK_DOMAIN : ''),
+        'site_id' => (int)_pleskSetting('plesk_site_id', '0'),
+        'verify_ssl' => _pleskSetting(
+            'plesk_verify_ssl',
+            (defined('PLESK_VERIFY_SSL') && PLESK_VERIFY_SSL) ? '1' : '0'
+        ) === '1',
+    ];
+}
+
 function _pleskXml(string $xml): string {
-    $ch = curl_init(rtrim(PLESK_HOST, '/') . '/enterprise/control/agent.php');
+    $cfg = _pleskConfig();
+    $ch = curl_init(rtrim($cfg['host'], '/') . '/enterprise/control/agent.php');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $xml,
-        CURLOPT_USERPWD        => PLESK_USER . ':' . PLESK_PASSWORD,
+        CURLOPT_USERPWD        => $cfg['user'] . ':' . $cfg['password'],
         CURLOPT_HTTPHEADER     => [
             'Content-Type: text/xml',
-            'HTTP_AUTH_LOGIN: '  . PLESK_USER,
-            'HTTP_AUTH_PASSWD: ' . PLESK_PASSWORD,
+            'HTTP_AUTH_LOGIN: '  . $cfg['user'],
+            'HTTP_AUTH_PASSWD: ' . $cfg['password'],
         ],
-        CURLOPT_SSL_VERIFYPEER => PLESK_VERIFY_SSL,
-        CURLOPT_SSL_VERIFYHOST => PLESK_VERIFY_SSL ? 2 : 0,
+        CURLOPT_SSL_VERIFYPEER => $cfg['verify_ssl'],
+        CURLOPT_SSL_VERIFYHOST => $cfg['verify_ssl'] ? 2 : 0,
         CURLOPT_TIMEOUT        => 10,
     ]);
     $resp = curl_exec($ch);
@@ -64,21 +88,23 @@ function _pleskResponseOk(string $resp): bool {
 function _pleskSiteId(): ?int {
     static $id = false;
     if ($id !== false) return $id;
-    if (!defined('PLESK_DOMAIN') || PLESK_DOMAIN === '') return $id = null;
+    $cfg = _pleskConfig();
+    if ($cfg['site_id'] > 0) return $id = $cfg['site_id'];
+    if ($cfg['domain'] === '') return $id = null;
 
-    $ch = curl_init(rtrim(PLESK_HOST, '/') . '/api/v2/domains');
+    $ch = curl_init(rtrim($cfg['host'], '/') . '/api/v2/domains');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_USERPWD        => PLESK_USER . ':' . PLESK_PASSWORD,
+        CURLOPT_USERPWD        => $cfg['user'] . ':' . $cfg['password'],
         CURLOPT_HTTPHEADER     => ['Accept: application/json'],
-        CURLOPT_SSL_VERIFYPEER => PLESK_VERIFY_SSL,
-        CURLOPT_SSL_VERIFYHOST => PLESK_VERIFY_SSL ? 2 : 0,
+        CURLOPT_SSL_VERIFYPEER => $cfg['verify_ssl'],
+        CURLOPT_SSL_VERIFYHOST => $cfg['verify_ssl'] ? 2 : 0,
         CURLOPT_TIMEOUT        => 10,
     ]);
     $resp = curl_exec($ch); curl_close($ch);
 
     foreach (json_decode($resp ?: '[]', true) ?? [] as $d) {
-        if (($d['name'] ?? '') === PLESK_DOMAIN) return $id = (int)$d['id'];
+        if (($d['name'] ?? '') === $cfg['domain']) return $id = (int)$d['id'];
     }
     return $id = null;
 }
@@ -104,17 +130,18 @@ function _pleskFindRecord(int $siteId, string $fqdn): ?int {
  * Crea o aggiorna il record A su Plesk DNS per hostname.zone → ip.
  */
 function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
-    if (!defined('PLESK_HOST') || PLESK_HOST === '') {
+    $cfg = _pleskConfig();
+    if ($cfg['host'] === '') {
         _pleskLog('update', $hostname, $zone, $ip, false, 'PLESK_HOST non configurato.');
         return false;
     }
-    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') {
+    if ($cfg['password'] === '') {
         _pleskLog('update', $hostname, $zone, $ip, false, 'PLESK_PASSWORD non configurata.');
         return false;
     }
     $siteId = _pleskSiteId();
     if (!$siteId) {
-        _pleskLog('update', $hostname, $zone, $ip, false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . PLESK_DOMAIN . '.');
+        _pleskLog('update', $hostname, $zone, $ip, false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . $cfg['domain'] . '.');
         return false;
     }
 
@@ -148,17 +175,18 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
  * Elimina il record A su Plesk DNS per hostname.zone.
  */
 function pleskDnsDelete(string $hostname, string $zone): bool {
-    if (!defined('PLESK_HOST') || PLESK_HOST === '') {
+    $cfg = _pleskConfig();
+    if ($cfg['host'] === '') {
         _pleskLog('delete', $hostname, $zone, '', false, 'PLESK_HOST non configurato.');
         return false;
     }
-    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') {
+    if ($cfg['password'] === '') {
         _pleskLog('delete', $hostname, $zone, '', false, 'PLESK_PASSWORD non configurata.');
         return false;
     }
     $siteId = _pleskSiteId();
     if (!$siteId) {
-        _pleskLog('delete', $hostname, $zone, '', false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . PLESK_DOMAIN . '.');
+        _pleskLog('delete', $hostname, $zone, '', false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . $cfg['domain'] . '.');
         return false;
     }
 

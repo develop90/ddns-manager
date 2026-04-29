@@ -150,6 +150,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     $msg = 'Impostazioni salvate.'; $msgType = 'success';
 }
 
+// Salva impostazioni Plesk
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_plesk_settings') {
+    $pleskHost = trim($_POST['plesk_host'] ?? '');
+    $pleskUser = trim($_POST['plesk_user'] ?? '');
+    $pleskPassword = $_POST['plesk_password'] ?? '';
+    $pleskDomain = strtolower(trim($_POST['plesk_domain'] ?? ''));
+    $pleskSiteId = trim($_POST['plesk_site_id'] ?? '');
+    $pleskVerifySsl = isset($_POST['plesk_verify_ssl']) ? '1' : '0';
+
+    if ($pleskHost === '' || !filter_var($pleskHost, FILTER_VALIDATE_URL)) {
+        $msg = 'Host Plesk non valido.';
+        $msgType = 'danger';
+    } elseif ($pleskUser === '') {
+        $msg = 'Utente Plesk obbligatorio.';
+        $msgType = 'danger';
+    } elseif ($pleskDomain === '') {
+        $msg = 'Dominio Plesk obbligatorio.';
+        $msgType = 'danger';
+    } elseif ($pleskSiteId !== '' && (!ctype_digit($pleskSiteId) || (int)$pleskSiteId < 1)) {
+        $msg = 'Site ID Plesk non valido.';
+        $msgType = 'danger';
+    } else {
+        setSettingValue('plesk_host', rtrim($pleskHost, '/'));
+        setSettingValue('plesk_user', $pleskUser);
+        if ($pleskPassword !== '') {
+            setSettingValue('plesk_password', $pleskPassword);
+        }
+        setSettingValue('plesk_domain', $pleskDomain);
+        setSettingValue('plesk_site_id', $pleskSiteId);
+        setSettingValue('plesk_verify_ssl', $pleskVerifySsl);
+        $msg = 'Impostazioni Plesk salvate.';
+        $msgType = 'success';
+    }
+}
+
 // Abilita/disabilita utente
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_user') {
     $userId = (int)($_POST['user_id'] ?? 0);
@@ -237,6 +272,14 @@ $pleskLogs = $db->query("
     LIMIT 50
 ")->fetchAll();
 $bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
+$pleskSettings = [
+    'host' => getSettingValue('plesk_host', PLESK_HOST),
+    'user' => getSettingValue('plesk_user', PLESK_USER),
+    'has_password' => getSettingValue('plesk_password', PLESK_PASSWORD) !== '',
+    'domain' => getSettingValue('plesk_domain', PLESK_DOMAIN),
+    'site_id' => getSettingValue('plesk_site_id', ''),
+    'verify_ssl' => getSettingValue('plesk_verify_ssl', PLESK_VERIFY_SSL ? '1' : '0'),
+];
 
 $bfMax    = (int)($bfSettings['bf_max_attempts'] ?? 5);
 $bfWindow = (int)($bfSettings['bf_window_min']   ?? 10);
@@ -482,6 +525,43 @@ $loginLogs = $loginLogs->fetchAll();
         <?php endif; ?>
     </div>
 
+    <!-- Impostazioni Plesk -->
+    <div class="card">
+        <h2>Configurazione Plesk DNS</h2>
+        <form method="POST">
+            <input type="hidden" name="action" value="save_plesk_settings">
+            <div class="form-inline" style="align-items:end;flex-wrap:wrap">
+                <div class="form-group" style="min-width:240px">
+                    <label>Host Plesk</label>
+                    <input type="url" name="plesk_host" value="<?= htmlspecialchars($pleskSettings['host'] ?? '') ?>" placeholder="https://plesk.gvweb.it:8443" required>
+                </div>
+                <div class="form-group" style="min-width:160px">
+                    <label>Utente</label>
+                    <input type="text" name="plesk_user" value="<?= htmlspecialchars($pleskSettings['user'] ?? '') ?>" required>
+                </div>
+                <div class="form-group" style="min-width:180px">
+                    <label>Password <?= $pleskSettings['has_password'] ? '(salvata)' : '' ?></label>
+                    <input type="password" name="plesk_password" placeholder="<?= $pleskSettings['has_password'] ? 'lascia vuoto = invariata' : '' ?>">
+                </div>
+            </div>
+            <div class="form-inline" style="align-items:end;flex-wrap:wrap;margin-top:1rem">
+                <div class="form-group" style="min-width:220px">
+                    <label>Dominio Plesk</label>
+                    <input type="text" name="plesk_domain" value="<?= htmlspecialchars($pleskSettings['domain'] ?? '') ?>" placeholder="ddns.gvweb.it" required>
+                </div>
+                <div class="form-group" style="min-width:120px;max-width:160px">
+                    <label>Site ID</label>
+                    <input type="number" name="plesk_site_id" value="<?= htmlspecialchars($pleskSettings['site_id'] ?? '') ?>" placeholder="9" min="1">
+                </div>
+                <div class="form-group" style="flex:0;min-width:150px">
+                    <label><input type="checkbox" name="plesk_verify_ssl" <?= ($pleskSettings['verify_ssl'] ?? '0') === '1' ? 'checked' : '' ?>> Verifica SSL</label>
+                </div>
+                <button type="submit" class="btn btn-primary">Salva Plesk</button>
+            </div>
+            <p class="text-muted mt-1">Se Plesk non trova il dominio automaticamente, imposta il Site ID manuale. Per ddns.gvweb.it dovrebbe essere 9.</p>
+        </form>
+    </div>
+
     <!-- Impostazioni Brute Force -->
     <div class="card">
         <h2>Protezione Brute Force</h2>
@@ -694,7 +774,7 @@ $loginLogs = $loginLogs->fetchAll();
         add_domain:'domini', delete_domain:'domini',
         add_user:'utenti', edit_user:'utenti', delete_user:'utenti', toggle_user:'utenti',
         upload_logo:'impostazioni', save_logo_url:'impostazioni', delete_logo:'impostazioni',
-        save_settings:'impostazioni', export_db:'impostazioni',
+        save_settings:'impostazioni', save_plesk_settings:'impostazioni', export_db:'impostazioni',
         unblock_ip:'log', clear_login_log:'log'
     };
     if (map[action]) activate(map[action]);
