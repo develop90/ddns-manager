@@ -66,6 +66,8 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    padding: 2rem 1rem;
+    background: #0f172a;
 }
 
 .login-box {
@@ -81,6 +83,21 @@ body {
     text-align: center;
     margin-bottom: 0.5rem;
     color: #38bdf8;
+}
+
+.login-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto 0.75rem;
+    text-decoration: none;
+}
+
+.login-logo img {
+    display: block;
+    max-width: 220px;
+    max-height: 90px;
+    object-fit: contain;
 }
 
 .login-box p.subtitle {

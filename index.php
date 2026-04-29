@@ -64,10 +64,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 <?php $logoUrl = getLogoUrl(); ?>
-<div class="login-wrap"<?= $logoUrl ? ' style="background-image:url(' . $logoUrl . ');background-size:cover;background-position:center"' : '' ?>>
+<div class="login-wrap">
     <div class="login-box">
         <?php if ($logoUrl): ?>
-            <a href="index.php"><img src="<?= $logoUrl ?>" style="max-height:80px;max-width:220px;object-fit:contain;margin-bottom:0.5rem"></a>
+            <a href="index.php" class="login-logo">
+                <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= APP_NAME ?>">
+            </a>
         <?php else: ?>
             <h1><?= APP_NAME ?></h1>
         <?php endif; ?>
