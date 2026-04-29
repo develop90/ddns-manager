@@ -21,6 +21,43 @@ function _pleskXml(string $xml): string {
     return $resp ?: '';
 }
 
+function _pleskLog(string $action, string $hostname, string $zone, string $ip, bool $success, string $message): void {
+    try {
+        getDb()->prepare("
+            INSERT INTO plesk_log (action, hostname, zone, ip_address, success, message)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ")->execute([$action, $hostname, $zone, $ip, $success ? 1 : 0, substr($message, 0, 1000)]);
+    } catch (Throwable $e) {
+        error_log('[DDNS] Plesk log failed: ' . $e->getMessage());
+    }
+}
+
+function _pleskResultMessage(string $resp): string {
+    if ($resp === '') return 'Risposta vuota da Plesk.';
+    $xml = @simplexml_load_string($resp);
+    if (!$xml) return 'Risposta XML non valida da Plesk.';
+
+    $result = $xml->xpath('//result')[0] ?? null;
+    if (!$result) return 'Risposta Plesk senza nodo result.';
+
+    $status = (string)($result->status ?? '');
+    $errText = trim((string)($result->errtext ?? ''));
+    $id = trim((string)($result->id ?? ''));
+
+    if ($status === 'ok') {
+        return $id !== '' ? "OK, record id $id." : 'OK.';
+    }
+
+    return $errText !== '' ? $errText : 'Operazione Plesk non riuscita.';
+}
+
+function _pleskResponseOk(string $resp): bool {
+    $xml = @simplexml_load_string($resp);
+    if (!$xml) return false;
+    $result = $xml->xpath('//result')[0] ?? null;
+    return $result && (string)($result->status ?? '') === 'ok';
+}
+
 /**
  * Recupera il site-id Plesk del dominio PLESK_DOMAIN (cache statica).
  */
@@ -67,16 +104,28 @@ function _pleskFindRecord(int $siteId, string $fqdn): ?int {
  * Crea o aggiorna il record A su Plesk DNS per hostname.zone → ip.
  */
 function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
-    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
+    if (!defined('PLESK_HOST') || PLESK_HOST === '') {
+        _pleskLog('update', $hostname, $zone, $ip, false, 'PLESK_HOST non configurato.');
+        return false;
+    }
+    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') {
+        _pleskLog('update', $hostname, $zone, $ip, false, 'PLESK_PASSWORD non configurata.');
+        return false;
+    }
     $siteId = _pleskSiteId();
-    if (!$siteId) return false;
+    if (!$siteId) {
+        _pleskLog('update', $hostname, $zone, $ip, false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . PLESK_DOMAIN . '.');
+        return false;
+    }
 
     $fqdn = $hostname . '.' . $zone . '.';
+    $notes = [];
 
     // Elimina eventuale record A esistente
     $existingId = _pleskFindRecord($siteId, $fqdn);
     if ($existingId) {
-        _pleskXml('<?xml version="1.0"?><packet><dns><del_rec><filter><id>' . $existingId . '</id></filter></del_rec></dns></packet>');
+        $delResp = _pleskXml('<?xml version="1.0"?><packet><dns><del_rec><filter><id>' . $existingId . '</id></filter></del_rec></dns></packet>');
+        $notes[] = 'Delete record esistente: ' . _pleskResultMessage($delResp);
     }
 
     // Crea il nuovo record (host relativo — Plesk aggiunge automaticamente il suffisso zona)
@@ -89,21 +138,39 @@ function pleskDnsUpdate(string $hostname, string $zone, string $ip): bool {
         '</add_rec></dns></packet>'
     );
 
-    return strpos($resp, '<status>ok</status>') !== false;
+    $ok = _pleskResponseOk($resp);
+    $notes[] = 'Add record: ' . _pleskResultMessage($resp);
+    _pleskLog('update', $hostname, $zone, $ip, $ok, implode(' ', $notes));
+    return $ok;
 }
 
 /**
  * Elimina il record A su Plesk DNS per hostname.zone.
  */
 function pleskDnsDelete(string $hostname, string $zone): bool {
-    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') return false;
+    if (!defined('PLESK_HOST') || PLESK_HOST === '') {
+        _pleskLog('delete', $hostname, $zone, '', false, 'PLESK_HOST non configurato.');
+        return false;
+    }
+    if (!defined('PLESK_PASSWORD') || PLESK_PASSWORD === '') {
+        _pleskLog('delete', $hostname, $zone, '', false, 'PLESK_PASSWORD non configurata.');
+        return false;
+    }
     $siteId = _pleskSiteId();
-    if (!$siteId) return false;
+    if (!$siteId) {
+        _pleskLog('delete', $hostname, $zone, '', false, 'Site ID Plesk non trovato per PLESK_DOMAIN=' . PLESK_DOMAIN . '.');
+        return false;
+    }
 
     $fqdn = $hostname . '.' . $zone . '.';
     $existingId = _pleskFindRecord($siteId, $fqdn);
-    if (!$existingId) return true;
+    if (!$existingId) {
+        _pleskLog('delete', $hostname, $zone, '', true, 'Record non presente su Plesk.');
+        return true;
+    }
 
     $resp = _pleskXml('<?xml version="1.0"?><packet><dns><del_rec><filter><id>' . $existingId . '</id></filter></del_rec></dns></packet>');
-    return strpos($resp, '<status>ok</status>') !== false;
+    $ok = _pleskResponseOk($resp);
+    _pleskLog('delete', $hostname, $zone, '', $ok, _pleskResultMessage($resp));
+    return $ok;
 }

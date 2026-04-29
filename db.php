@@ -62,6 +62,19 @@ function getDb(): PDO {
             FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS plesk_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,
+            hostname TEXT,
+            zone TEXT,
+            ip_address TEXT,
+            success INTEGER DEFAULT 0,
+            message TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
     // Migrazione: aggiunge source_type se non esiste (DB già esistente)
     try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
     // Migrazione: aggiunge active agli utenti

@@ -7,6 +7,35 @@ $user = getCurrentUser();
 $msg = '';
 $msgType = '';
 
+// Esporta database SQLite (solo admin)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'export_db') {
+    $tmpFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'ddns-manager-' . date('Ymd-His') . '-' . bin2hex(random_bytes(4)) . '.sqlite';
+    try {
+        $db->exec('VACUUM INTO ' . $db->quote($tmpFile));
+        if (!is_file($tmpFile)) {
+            throw new RuntimeException('Export file non creato.');
+        }
+
+        session_write_close();
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        $downloadName = 'ddns-manager-' . date('Ymd-His') . '.sqlite';
+        header('Content-Type: application/vnd.sqlite3');
+        header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+        header('Content-Length: ' . filesize($tmpFile));
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        readfile($tmpFile);
+        @unlink($tmpFile);
+        exit;
+    } catch (Throwable $e) {
+        @unlink($tmpFile);
+        $msg = 'Export database non riuscito.';
+        $msgType = 'danger';
+    }
+}
+
 // Aggiungi dominio
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_domain') {
     $zone = strtolower(trim($_POST['zone'] ?? ''));
@@ -200,6 +229,12 @@ $recentLogs = $db->query("
     JOIN domains d ON h.domain_id = d.id
     ORDER BY l.updated_at DESC
     LIMIT 20
+")->fetchAll();
+$pleskLogs = $db->query("
+    SELECT *
+    FROM plesk_log
+    ORDER BY created_at DESC
+    LIMIT 50
 ")->fetchAll();
 $bfSettings = $db->query("SELECT key, value FROM settings WHERE key LIKE 'bf_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -468,6 +503,16 @@ $loginLogs = $loginLogs->fetchAll();
         </form>
     </div>
 
+    <!-- Export database -->
+    <div class="card">
+        <h2>Backup database</h2>
+        <p class="text-muted mb-1">Scarica uno snapshot SQLite consistente del database applicativo.</p>
+        <form method="POST" onsubmit="return confirm('Esportare il database? Il file contiene utenti, token API e log.')">
+            <input type="hidden" name="action" value="export_db">
+            <button type="submit" class="btn btn-primary">Esporta database</button>
+        </form>
+    </div>
+
     </div><!-- /tab-impostazioni -->
 
     <!-- TAB: Log -->
@@ -582,6 +627,38 @@ $loginLogs = $loginLogs->fetchAll();
             </table>
         <?php endif; ?>
     </div>
+
+    <!-- Log Plesk -->
+    <div class="card">
+        <h2>Log Plesk DNS</h2>
+        <?php if (empty($pleskLogs)): ?>
+            <p class="text-muted">Nessuna operazione Plesk registrata.</p>
+        <?php else: ?>
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Azione</th><th>Host</th><th>IP</th><th>Esito</th><th>Messaggio</th></tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($pleskLogs as $pl): ?>
+                    <tr>
+                        <td class="text-muted"><?= date('d/m/Y H:i:s', strtotime($pl['created_at'])) ?></td>
+                        <td><?= htmlspecialchars($pl['action']) ?></td>
+                        <td><?= htmlspecialchars(($pl['hostname'] ?: '-') . ($pl['zone'] ? '.' . $pl['zone'] : '')) ?></td>
+                        <td><?= $pl['ip_address'] ? '<span class="ip-badge">' . htmlspecialchars($pl['ip_address']) . '</span>' : '<span class="text-muted">-</span>' ?></td>
+                        <td>
+                            <?php if ((int)$pl['success'] === 1): ?>
+                                <span style="color:#86efac">OK</span>
+                            <?php else: ?>
+                                <span style="color:#fca5a5">Errore</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-muted"><?= htmlspecialchars($pl['message'] ?: '-') ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
     </div><!-- /tab-log -->
 
 </div><!-- /container -->
@@ -617,7 +694,7 @@ $loginLogs = $loginLogs->fetchAll();
         add_domain:'domini', delete_domain:'domini',
         add_user:'utenti', edit_user:'utenti', delete_user:'utenti', toggle_user:'utenti',
         upload_logo:'impostazioni', save_logo_url:'impostazioni', delete_logo:'impostazioni',
-        save_settings:'impostazioni',
+        save_settings:'impostazioni', export_db:'impostazioni',
         unblock_ip:'log', clear_login_log:'log'
     };
     if (map[action]) activate(map[action]);
