@@ -10,7 +10,7 @@ define('DEFAULT_TTL', 300);
 
 // Versione applicazione
 define('APP_VERSION', '1.0');
-define('APP_BUILD', 29);
+define('APP_BUILD', 30);
 
 // Tutti i segreti vengono dal file .env (non versionato)
 $_env = is_file(__DIR__ . '/.env') ? parse_ini_file(__DIR__ . '/.env') : [];
@@ -19,6 +19,7 @@ define('PLESK_HOST',       $_env['PLESK_HOST']     ?? 'https://plesk.gvweb.it:84
 define('PLESK_USER',       $_env['PLESK_USER']     ?? 'admin');
 define('PLESK_PASSWORD',   $_env['PLESK_PASSWORD'] ?? '');
 define('PLESK_DOMAIN',     $_env['PLESK_DOMAIN']   ?? '');
+define('PLESK_SITE_ID',    (int)($_env['PLESK_SITE_ID'] ?? 9));
 define('PLESK_VERIFY_SSL', ($_env['PLESK_VERIFY_SSL'] ?? 'true') !== 'false');
 define('UNBLOCK_SECRET',   $_env['UNBLOCK_SECRET'] ?? '');
 unset($_env);

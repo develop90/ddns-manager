@@ -15,7 +15,7 @@ function _pleskConfig(): array {
         'user' => _pleskSetting('plesk_user', defined('PLESK_USER') ? PLESK_USER : ''),
         'password' => _pleskSetting('plesk_password', defined('PLESK_PASSWORD') ? PLESK_PASSWORD : ''),
         'domain' => _pleskSetting('plesk_domain', defined('PLESK_DOMAIN') ? PLESK_DOMAIN : ''),
-        'site_id' => (int)_pleskSetting('plesk_site_id', '0'),
+        'site_id' => (int)_pleskSetting('plesk_site_id', defined('PLESK_SITE_ID') ? (string)PLESK_SITE_ID : '0'),
         'verify_ssl' => _pleskSetting(
             'plesk_verify_ssl',
             (defined('PLESK_VERIFY_SSL') && PLESK_VERIFY_SSL) ? '1' : '0'

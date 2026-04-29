@@ -277,7 +277,7 @@ $pleskSettings = [
     'user' => getSettingValue('plesk_user', PLESK_USER),
     'has_password' => getSettingValue('plesk_password', PLESK_PASSWORD) !== '',
     'domain' => getSettingValue('plesk_domain', PLESK_DOMAIN),
-    'site_id' => getSettingValue('plesk_site_id', ''),
+    'site_id' => getSettingValue('plesk_site_id', defined('PLESK_SITE_ID') ? (string)PLESK_SITE_ID : ''),
     'verify_ssl' => getSettingValue('plesk_verify_ssl', PLESK_VERIFY_SSL ? '1' : '0'),
 ];
 
