@@ -41,3 +41,13 @@ PLESK_DOMAIN=ddns.gvweb.it
 - Footer mostra versione e build su tutte le pagine
 - Niente librerie esterne, SVG inline per icone
 - `plesk_test.php` è file temporaneo di debug (non rimuovere finché DNS non è stabile)
+
+## Contesto agente
+Prima di lavorare su un task, leggere nell'ordine:
+1. `AGENTS.md`
+2. `.agent/PROJECT_CONTEXT.md`
+3. `.agent/LESSONS.md`
+4. `.agent/WORKFLOW.md` se il task arriva dal bridge ChatGPT ↔ Codex
+5. solo la documentazione e il codice pertinenti al task
+
+Regola di fonte: Notion conserva roadmap, decisioni e contesto progettuale; GitHub conserva istruzioni operative e verità tecnica verificabile. In caso di conflitto sulla realtà implementata, verificare repository/configurazione corrente prima di applicare indicazioni generiche.
