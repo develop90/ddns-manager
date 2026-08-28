@@ -57,21 +57,84 @@ function getDb(): PDO {
             old_ip TEXT,
             new_ip TEXT,
             source_ip TEXT,
+            source_type TEXT DEFAULT '',
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE CASCADE
         )
     ");
 
-    // Crea admin di default se non esiste
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS plesk_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,
+            hostname TEXT,
+            zone TEXT,
+            ip_address TEXT,
+            success INTEGER DEFAULT 0,
+            message TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+    // Migrazione: aggiunge source_type se non esiste (DB già esistente)
+    try { $pdo->exec("ALTER TABLE update_log ADD COLUMN source_type TEXT DEFAULT ''"); } catch (PDOException $e) {}
+    // Migrazione: aggiunge active agli utenti
+    try { $pdo->exec("ALTER TABLE users ADD COLUMN active INTEGER DEFAULT 1"); } catch (PDOException $e) {}
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ");
+    foreach (['bf_max_attempts'=>'5','bf_window_min'=>'10','bf_lockout_min'=>'15','bf_whitelist'=>''] as $k=>$v) {
+        $pdo->prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)")->execute([$k, $v]);
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS login_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            ip TEXT,
+            success INTEGER DEFAULT 0,
+            logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    // Crea admin di default se non esiste (primo avvio)
     $stmt = $pdo->query("SELECT COUNT(*) as c FROM users");
     if ($stmt->fetch()['c'] == 0) {
-        $hash = password_hash('admin', PASSWORD_BCRYPT);
+        $defaultPass = bin2hex(random_bytes(8)); // 16 char hex, random ad ogni primo avvio
+        $hash  = password_hash($defaultPass, PASSWORD_BCRYPT);
         $token = bin2hex(random_bytes(32));
         $pdo->prepare("INSERT INTO users (username, password, is_admin, api_token) VALUES (?, ?, 1, ?)")
             ->execute(['admin', $hash, $token]);
+        // Scrivi la password in un file temporaneo leggibile solo dal server
+        $initFile = dirname($pdo->query("PRAGMA database_list")->fetch()['file']) . '/ADMIN_INIT_PASSWORD.txt';
+        file_put_contents($initFile, "Password admin iniziale: $defaultPass\nEliminare questo file dopo il primo login.\n");
+        error_log("[DDNS] Admin iniziale creato. Password: $defaultPass");
     }
 
     return $pdo;
+}
+
+function getLogoUrl(): ?string {
+    $db  = getDb();
+    $url = $db->query("SELECT value FROM settings WHERE key='logo_url'")->fetchColumn();
+    if ($url) return $url;
+    $ext = $db->query("SELECT value FROM settings WHERE key='logo_ext'")->fetchColumn();
+    return $ext ? BASE_URL . '/logo.php?v=' . @filemtime(__DIR__ . '/data/logo.' . $ext) : null;
+}
+
+function getSettingValue(string $key, ?string $default = null): ?string {
+    $stmt = getDb()->prepare("SELECT value FROM settings WHERE key = ?");
+    $stmt->execute([$key]);
+    $value = $stmt->fetchColumn();
+    return $value === false ? $default : (string)$value;
+}
+
+function setSettingValue(string $key, string $value): void {
+    getDb()->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
+        ->execute([$key, $value]);
 }
 
 function isLoggedIn(): bool {

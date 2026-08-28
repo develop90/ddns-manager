@@ -20,8 +20,8 @@
  */
 
 // Non servono sessioni per l'API
-require_once __DIR__ . '/db.php';
-define('DB_PATH', __DIR__ . '/data/ddns.sqlite');
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/plesk.php';
 
 header('Content-Type: text/plain; charset=utf-8');
 
@@ -67,7 +67,7 @@ if (!$user && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
     }
 }
 
-if (!$user) {
+if (!$user || !($user['active'] ?? 1)) {
     http_response_code(401);
     header('WWW-Authenticate: Basic realm="DDNS Update"');
     echo 'badauth';
@@ -138,7 +138,9 @@ if ($oldIp === $myip) {
 $db->prepare("UPDATE hosts SET ip_address = ?, last_update = CURRENT_TIMESTAMP WHERE id = ?")
     ->execute([$myip, $host['id']]);
 
-$db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip) VALUES (?, ?, ?, ?)")
-    ->execute([$host['id'], $oldIp, $myip, $clientIp]);
+$db->prepare("INSERT INTO update_log (host_id, old_ip, new_ip, source_ip, source_type) VALUES (?, ?, ?, ?, ?)")
+    ->execute([$host['id'], $oldIp, $myip, $clientIp, 'Router / API']);
+
+pleskDnsUpdate($hostPart, $domain['zone'], $myip);
 
 echo 'good ' . $myip;
